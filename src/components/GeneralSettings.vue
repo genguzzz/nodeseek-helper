@@ -176,13 +176,10 @@ const toggles: { key: BoolKey; label: string; help: string }[] = [
 
 <style>
 .nsh-general {
-  padding: 18px 22px;
+  /* 滚动容器占满面板（滚动条贴右边），内容列最宽 820px 并水平居中 */
+  padding: 18px max(22px, calc((100% - 820px) / 2));
   overflow-y: auto;
   height: 100%;
-}
-/* 滚动容器占满面板宽度（滚动条贴右边），只限制内容宽度 */
-.nsh-general > * {
-  max-width: 760px;
 }
 .nsh-row {
   display: flex;

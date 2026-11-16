@@ -43,7 +43,7 @@ const fmt = (t: number): string => new Date(t).toLocaleString();
 
 <style>
 .nsh-history {
-  padding: 14px 22px;
+  padding: 14px max(22px, calc((100% - 820px) / 2));
   overflow-y: auto;
   height: 100%;
 }
