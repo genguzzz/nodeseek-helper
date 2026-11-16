@@ -127,8 +127,11 @@ function localItems(): LocalItem[] {
 }
 
 /**
- * 由本地数据生成同步文档：内容摘要与上次同步不同的条目时间戳置为 now，
- * 本地已不存在的条目生成墓碑。会就地更新 meta。
+ * 由本地数据生成同步文档。会就地更新 meta（调用方传入副本，同步成功后再提交）。
+ * - 内容与上次同步不同的条目：时间戳置为 now；
+ * - 从未同步过的条目（meta 里没有）：时间戳为 0，合并时让位于云端已有的同一条目
+ *   （如新设备自带的默认分组不会覆盖其他设备改过的名字）；推送前由 stampNew 盖上真实时间；
+ * - 本地已不存在的条目生成墓碑。
  * `stats.changed` 返回与上次同步相比发生变化（新增 / 修改 / 删除）的条目数。
  */
 export function buildLocalDoc(meta: SyncMeta, device: string, now = Date.now(), stats?: { changed: number }): SyncDocument {
@@ -149,7 +152,7 @@ export function buildLocalDoc(meta: SyncMeta, device: string, now = Date.now(), 
     const h = hash(it.value);
     const m = meta[it.key];
     if (!m || m.d || m.h !== h) {
-      meta[it.key] = { h, t: now };
+      meta[it.key] = { h, t: m ? now : 0 };
       changed++;
     }
     put(doc, it.key, { v: it.value, t: meta[it.key].t } as Entry<never>);
@@ -219,6 +222,33 @@ export function mergeDocs(local: SyncDocument, remote: SyncDocument): SyncDocume
       stickers: pick(local.order.stickers, remote.order.stickers, preferRemote) as Entry<string[]>,
     },
   };
+}
+
+/** 遍历文档里所有条目（含设置与顺序表） */
+function entriesOf(doc: SyncDocument): [string, Entry<unknown>][] {
+  const out: [string, Entry<unknown>][] = [
+    ['settings', doc.settings],
+    ['order:groups', doc.order.groups],
+    ['order:stickers', doc.order.stickers],
+  ];
+  for (const [kind, map] of [['host', doc.hosts], ['group', doc.groups], ['sticker', doc.stickers]] as const) {
+    for (const [id, e] of Object.entries(map as Record<string, Entry<unknown>>)) out.push([`${kind}:${id}`, e]);
+  }
+  return out;
+}
+
+/** 文档里最大的条目时间戳（逻辑时钟用） */
+export function maxEntryTime(doc: SyncDocument): number {
+  return entriesOf(doc).reduce((m, [, e]) => Math.max(m, e.t), 0);
+}
+
+/** 合并后仍是 0 的条目（云端没有的新条目）盖上真实时间，并同步到 meta */
+export function stampNew(doc: SyncDocument, meta: SyncMeta, now: number): void {
+  for (const [key, e] of entriesOf(doc)) {
+    if (e.t !== 0) continue;
+    e.t = now;
+    if (meta[key]) meta[key].t = now;
+  }
 }
 
 /** 文档内容摘要（忽略 updatedAt / device），用于判断合并后是否需要回写 */

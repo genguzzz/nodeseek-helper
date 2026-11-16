@@ -145,32 +145,41 @@ export function seedBuiltinPacks(force = false): void {
   }
 }
 
-let remoteDepth = 0;
-/** 当前是否正在应用其他标签页写入的数据（同步引擎据此忽略这类变更） */
-export const isApplyingRemote = (): boolean => remoteDepth > 0;
+/** 各持久化对象的「立即落盘」函数 */
+const flushers: (() => void)[] = [];
+
+/** 立即写入所有还在防抖中的修改（同步引擎在同步结束、释放跨标签页锁之前调用） */
+export function flushStores(): void {
+  for (const f of flushers) f();
+}
 
 /** 持久化 + 多标签页同步；remote 写入时跳过一次回写，避免死循环 */
 function persist<T extends object>(key: string, target: T): void {
   let applyingRemote = false;
   let timer = 0;
+  const flush = (): void => {
+    if (!timer) return;
+    clearTimeout(timer);
+    timer = 0;
+    GM_setValue(key, JSON.parse(JSON.stringify(toRaw(target))));
+  };
+  flushers.push(flush);
   watch(
     target,
     () => {
       if (applyingRemote) return;
       clearTimeout(timer);
-      timer = window.setTimeout(() => GM_setValue(key, JSON.parse(JSON.stringify(toRaw(target)))), 200);
+      timer = window.setTimeout(() => {
+        timer = 0;
+        GM_setValue(key, JSON.parse(JSON.stringify(toRaw(target))));
+      }, 200);
     },
     { deep: true },
   );
   GM_addValueChangeListener(key, (_name, _old, value, remote) => {
     if (!remote || !value) return;
     applyingRemote = true;
-    remoteDepth++;
-    try {
-      Object.assign(target, value);
-    } finally {
-      remoteDepth--;
-    }
+    Object.assign(target, value);
     queueMicrotask(() => (applyingRemote = false));
   });
 }

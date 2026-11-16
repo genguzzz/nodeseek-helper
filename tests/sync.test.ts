@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { settings, stickerData, type Sticker } from '../src/core/store';
-import { applyDoc, buildLocalDoc, iconFromSync, iconToSync, mergeDocs, type SyncDocument, type SyncMeta } from '../src/sync/format';
+import { applyDoc, buildLocalDoc, iconFromSync, iconToSync, mergeDocs, stampNew, type SyncDocument, type SyncMeta } from '../src/sync/format';
 import { open, PassphraseError, seal } from '../src/sync/crypto';
 
 const sticker = (id: string, extra: Partial<Sticker> = {}): Sticker => ({
@@ -25,14 +25,19 @@ function resetLocal(stickers: Sticker[]): void {
 describe('同步文档：生成与变更追踪', () => {
   beforeEach(() => resetLocal([sticker('a'), sticker('b')]));
 
-  it('未变化的条目保持原时间戳，变化的条目刷新时间戳', () => {
+  it('从未同步过的条目时间为 0（让位于云端），推送前盖上真实时间；之后变化的条目刷新时间戳', () => {
     const meta: SyncMeta = {};
     const d1 = buildLocalDoc(meta, 'dev1', 1000);
+    expect(d1.stickers.a.t).toBe(0);
+    stampNew(d1, meta, 1000);
     expect(d1.stickers.a.t).toBe(1000);
+    expect(meta['sticker:a'].t).toBe(1000);
     stickerData.stickers[0].name = 'a2';
-    const d2 = buildLocalDoc(meta, 'dev1', 2000);
+    const stats = { changed: 0 };
+    const d2 = buildLocalDoc(meta, 'dev1', 2000, stats);
     expect(d2.stickers.a.t).toBe(2000);
     expect(d2.stickers.b.t).toBe(1000);
+    expect(stats.changed).toBe(1);
   });
 
   it('本地删除的条目生成墓碑', () => {

@@ -96,8 +96,8 @@ async function relay() {
     const body = method === 'GET' || method === 'HEAD' ? undefined : requestBody();
     const res = await http({ url: target, method, headers, body, binary });
     const out = { 'Content-Type': headerOf(res.headers, 'Content-Type') || 'application/json', 'X-NSH-Relay': '1', 'Cache-Control': 'no-store' };
-    // 同步协议依赖的版本头原样透传
-    for (const h of ['ETag', 'X-Updated-At', 'Last-Modified']) {
+    // 同步协议依赖的版本头与口令锁状态原样透传
+    for (const h of ['ETag', 'X-Updated-At', 'Last-Modified', 'X-NSH-Locked']) {
       const v = headerOf(res.headers, h);
       if (v) out[h] = v;
     }
