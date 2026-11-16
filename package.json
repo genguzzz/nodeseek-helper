@@ -1,0 +1,23 @@
+{
+  "name": "nodeseek-helper",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build && vite build -c vite.inject.config.ts && node scripts/build-proxy.mjs",
+    "build:userscript": "vite build",
+    "build:proxy": "vite build -c vite.inject.config.ts && node scripts/build-proxy.mjs",
+    "typecheck": "vue-tsc --noEmit"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^6.0.11",
+    "typescript": "5.9",
+    "vite": "^8.3.8",
+    "vite-plugin-monkey": "^8.1.1",
+    "vue-tsc": "^3.3.14"
+  },
+  "dependencies": {
+    "vue": "3.5"
+  }
+}

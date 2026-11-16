@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>NodeSeek 代理注入模拟页</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+
+<style>
+  /* 摘自 nodeseek.com 线上样式（scoped data-v） */
+  body { margin: 0; font-family: -apple-system, 'PingFang SC', sans-serif; background: #f4f4f4; --bg-sub-color: #fbfbfb; --bg-main-color:#fff; color:#333 }
+  body.dark-layout { background: #1f1f1f; --bg-sub-color: #272727; --bg-main-color:#222; color:#ddd }
+  header { background: var(--bg-main-color); box-shadow: 0 1px 2px rgba(0,0,0,.08) }
+  #nsk-head { max-width: 1000px; margin: auto; display: flex; align-items: center; height: 52px; gap: 16px; padding: 0 12px }
+  .color-theme-switcher { cursor: pointer; font-size: 18px }
+  main { max-width: 1000px; margin: auto; padding: 8px }
+  .post-content { background: var(--bg-main-color); padding: 16px; border-radius: 5px }
+  .post-content img { max-width: 100%; }
+  .md-editor[data-v-4eb2f640] { margin: 30px 8px; border-radius: 5px; box-shadow: rgba(0,0,0,.3) 0 0 3px; background-color: var(--bg-sub-color); }
+  .tab-select[data-v-4eb2f640] { display: flex; align-items: center }
+  .tab-select .tab-option[data-v-4eb2f640] { font-size: 14px; line-height: 30px; height: 30px; cursor: pointer; padding: 0 10px; }
+  .editor-top-button[data-v-4eb2f640] { line-height: 1; display: block; padding: 4px; margin: 0 2px; border-radius: 3px; color: inherit }
+  .topic-select[data-v-4eb2f640] { display: flex; justify-content: space-between; align-items: center; padding: 0 1.5rem; font-size: 14px; line-height: 30px; height: 30px; }
+  .topic-select .submit[data-v-4eb2f640] { padding: 0 1rem; font-size: 14px; line-height: 25px; height: 25px; border-radius: 4px; background:#2ea44f; color:#fff; border:none }
+  .expression[data-v-4eb2f640] { display: flex; align-items: center; padding: 0 5px; height: 30px; background-color: #f8f8f8; border-bottom: 1px solid rgba(0,0,0,.05); }
+  .dark-layout .md-editor .expression { background-color: #515151 !important; }
+  .expression .exp-item[data-v-4eb2f640] { padding: 0 5px; cursor: pointer; transition: .3s; font-size: 14px }
+  .expression .exp-item[data-v-4eb2f640]:hover { transform: scale(1.1); }
+  .expression .exp-item.current-group[data-v-4eb2f640] { transform: scale(1.2); }
+  .exp-container[data-v-4eb2f640] { max-height: 0; box-sizing: border-box; padding: 0 10px; width: 100%; display: flex; flex-wrap: wrap; overflow: hidden; transition: max-height .5s; }
+  .exp-container.open[data-v-4eb2f640] { padding: 10px; max-height: 280px; overflow: auto; }
+  .mde-toolbar[data-v-ef03aa6c] { border-top: 1px solid rgba(0,0,0,.1); padding: 0 10px; line-height: 1; height: 28px; display: flex; align-items: center; }
+  .mde-toolbar .toolbar-item[data-v-ef03aa6c] { margin: 0 2px; padding: 4px 3px; border-radius: 2px; cursor: pointer; color: #777; }
+  .mde-toolbar .toolbar-item[data-v-ef03aa6c]:hover { background-color: rgba(0,0,0,.05); }
+  .CodeMirror { height: 200px; background: transparent; color: inherit }
+</style>
+</head>
+<body class="light-layout">
+<header><div id="nsk-head"><strong>NodeSeek <small>mock</small></strong><span style="flex:1"></span><div class="color-theme-switcher" onclick="document.body.classList.toggle('dark-layout');document.body.classList.toggle('light-layout')">🌓</div></div></header>
+<main>
+  <div class="post-content">
+    <p>帖子正文示例，悬浮下面的图片会出现「收藏为表情」：</p>
+    <img src="https://cdn.nodeimage.com/i/yNwUePEGVy7u15Dav0dsnKe44c3YJvAK.gif" alt="emote" style="width:120px" />
+    <img src="https://cdn.nodeimage.com/i/kiTPNRkkUMXrFbcqiQjInY997EXX8ugQ.png" alt="emote" style="width:120px" />
+  </div>
+  <div data-v-4eb2f640 class="md-editor">
+    <div data-v-4eb2f640 id="editor-body">
+      <div data-v-4eb2f640 class="tab-select window_header">
+        <div data-v-4eb2f640 style="display:flex"><div data-v-4eb2f640 class="tab-option">编辑</div><div data-v-4eb2f640 class="tab-option">预览</div></div>
+        <div data-v-4eb2f640 style="margin-left:auto;margin-right:10px">支持 <a>markdown语法</a></div>
+        <a data-v-4eb2f640 href="javascript:void(0)" class="editor-top-button" title="行号">#</a>
+        <a data-v-4eb2f640 href="javascript:void(0)" class="editor-top-button" title="全屏">⛶</a>
+      </div>
+      <div data-v-ef03aa6c data-v-4eb2f640 class="mde-toolbar">
+        <span data-v-ef03aa6c class="i-icon toolbar-item" title="加粗"><b>B</b></span>
+        <span data-v-ef03aa6c class="i-icon toolbar-item" title="斜体"><i>I</i></span>
+        <span data-v-ef03aa6c class="i-icon toolbar-item" title="图片">🖼</span>
+        <span data-v-ef03aa6c class="i-icon toolbar-item" title="代码块">{}</span>
+      </div>
+      <div data-v-4eb2f640 class="content-area split-view-container"><div data-v-4eb2f640 id="cm-editor-wrapper"><div id="code-mirror-editor"></div></div></div>
+      <div data-v-4eb2f640 class="expression">
+        <div data-v-4eb2f640 class="exp-item sticker-group-ac">AC娘</div>
+        <div data-v-4eb2f640 class="exp-item sticker-group-bq">贴吧</div>
+        <div data-v-4eb2f640 class="exp-item sticker-group-app">应用</div>
+      </div>
+      <div data-v-4eb2f640 class="exp-container"><span>（原生表情区）</span></div>
+    </div>
+    <div data-v-4eb2f640 class="topic-select"><span></span><button data-v-4eb2f640 class="submit btn">发布评论</button></div>
+  </div>
+</main>
+<script>
+  const cm = CodeMirror(document.getElementById('code-mirror-editor'), { lineWrapping: true, mode: 'gfm' });
+  window.codemirrorInstance = cm;
+  document.querySelectorAll('.exp-item').forEach((el) =>
+    el.addEventListener('click', () => {
+      const c = document.querySelector('.exp-container');
+      const was = el.classList.contains('current-group');
+      document.querySelectorAll('.exp-item').forEach((x) => x.classList.remove('current-group'));
+      if (!was) el.classList.add('current-group');
+      c.classList.toggle('open', !was);
+    }),
+  );
+</script>
+</body>
+</html>

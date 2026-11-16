@@ -1,0 +1,348 @@
+/* ========== 设计令牌：跟随 NodeSeek 亮/暗主题（body.dark-layout） ========== */
+/*
+ * 直接引用 NodeSeek 自身的主题变量（:root 与 body.dark-layout 中定义），
+ * 站点日/夜切换时这些变量随之变化，插件 UI 无需任何 JS 即同步切换。
+ * 括号内为站点变量缺失时的兜底值（与站点亮色一致）。
+ */
+.nsh-scope {
+  --nsh-accent: var(--main-color, #2ea44f);
+  --nsh-accent-hover: var(--sub-color, #45ca6b);
+  --nsh-accent-soft: rgba(46, 164, 79, 0.12);
+  --nsh-bg: var(--bg-main-color, #fff);
+  --nsh-bg-sub: var(--bg-sub-color, #fbfbfb);
+  --nsh-bg-muted: var(--glass-color, rgba(0, 0, 0, 0.05));
+  --nsh-border: rgba(0, 0, 0, 0.1);
+  --nsh-text: var(--text-color, #333);
+  --nsh-text-strong: var(--link-hover-color, #333);
+  --nsh-text-sub: var(--gray-color, #888);
+  --nsh-text-faint: #aaa;
+  --nsh-tabs-bg: var(--tabs-bg, #f8fafc);
+  --nsh-tab-active-bg: var(--tab-active-bg, #fff);
+  --nsh-danger: #d73a49;
+  --nsh-star: #f5a623;
+  /* 与站点编辑器 .md-editor 的 0 0 3px 阴影同一语言，弹层略加深 */
+  --nsh-shadow: 0 0 3px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.12);
+  --nsh-radius: 5px;
+  color: var(--nsh-text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', 'PingFang SC', 'Microsoft YaHei', 'Source Han Sans SC', 'Noto Sans CJK SC', sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+}
+/* 站点变量未覆盖的部分（边框、阴影、强调色透明度）单独给夜间值 */
+.dark-layout .nsh-scope {
+  --nsh-accent-soft: rgba(46, 164, 79, 0.2);
+  --nsh-border: rgba(255, 255, 255, 0.08);
+  --nsh-text-faint: #6f6f6f;
+  --nsh-shadow: 0 0 3px rgba(0, 0, 0, 0.6), 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+.nsh-scope *,
+.nsh-scope *::before,
+.nsh-scope *::after {
+  box-sizing: border-box;
+}
+
+/* ========== 注入到原生编辑器的元素 ========== */
+.md-editor .nsh-tb,
+.md-editor .nsh-top {
+  display: inline-flex;
+  align-items: center;
+  color: inherit;
+}
+.md-editor .nsh-top svg {
+  display: block;
+}
+.md-editor.nsh-dragging .CodeMirror {
+  outline: 2px dashed #2ea44f;
+  outline-offset: -4px;
+  background-image: linear-gradient(rgba(46, 164, 79, 0.06), rgba(46, 164, 79, 0.06));
+}
+
+
+/* 工具栏可见时隐藏顶栏的表情入口，避免重复 */
+#editor-body:has(.mde-toolbar) .nsh-top-emoji {
+  display: none !important;
+}
+.md-editor .nsh-tb.nsh-active {
+  background-color: rgba(0, 0, 0, 0.08);
+}
+.dark-layout .md-editor .nsh-tb.nsh-active {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* ========== 通用控件 ========== */
+.nsh-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 14px;
+  border-radius: 4px;
+  border: 1px solid var(--nsh-border);
+  background: var(--nsh-bg);
+  color: var(--nsh-text);
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  user-select: none;
+}
+.nsh-btn:hover {
+  border-color: var(--nsh-accent);
+  color: var(--nsh-accent);
+}
+.nsh-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.nsh-btn.primary {
+  background: var(--nsh-accent);
+  border-color: var(--nsh-accent);
+  color: #fff;
+}
+.nsh-btn.primary:hover {
+  background: var(--nsh-accent-hover);
+  color: #fff;
+}
+.nsh-btn.danger:hover {
+  border-color: var(--nsh-danger);
+  color: var(--nsh-danger);
+}
+.nsh-btn.sm {
+  height: 26px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+.nsh-btn.ghost {
+  border-color: transparent;
+  background: transparent;
+}
+.nsh-btn.ghost:hover {
+  background: var(--nsh-bg-muted);
+}
+.nsh-input,
+.nsh-select,
+.nsh-textarea {
+  width: 100%;
+  height: 34px;
+  padding: 0 10px;
+  border-radius: 4px;
+  border: 1px solid var(--nsh-border);
+  background: var(--nsh-bg);
+  color: var(--nsh-text);
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.nsh-textarea {
+  height: auto;
+  min-height: 72px;
+  padding: 8px 10px;
+  resize: vertical;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.nsh-input:focus,
+.nsh-select:focus,
+.nsh-textarea:focus {
+  border-color: var(--nsh-accent);
+  box-shadow: 0 0 0 3px var(--nsh-accent-soft);
+}
+.nsh-switch {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  flex: none;
+  border-radius: var(--nsh-radius);
+  background: var(--nsh-text-faint);
+  cursor: pointer;
+  transition: background 0.2s;
+  border: none;
+  padding: 0;
+}
+.nsh-switch::after {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.2s;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+}
+.nsh-switch.on {
+  background: var(--nsh-accent);
+}
+.nsh-switch.on::after {
+  transform: translateX(16px);
+}
+.nsh-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  color: var(--nsh-text-sub);
+  background: transparent;
+  border: 1px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+}
+.nsh-chip:hover {
+  background: var(--nsh-bg-muted);
+  color: var(--nsh-text);
+}
+.nsh-chip.active {
+  background: var(--nsh-accent-soft);
+  color: var(--nsh-accent);
+  font-weight: 600;
+}
+.nsh-chip .nsh-count {
+  font-size: 11px;
+  opacity: 0.7;
+  font-weight: 400;
+}
+.nsh-icon {
+  display: inline-flex;
+  width: 1.1em;
+  height: 1.1em;
+  align-items: center;
+  justify-content: center;
+}
+.nsh-icon svg {
+  width: 100%;
+  height: 100%;
+}
+.nsh-empty {
+  padding: 28px 12px;
+  text-align: center;
+  color: var(--nsh-text-faint);
+  font-size: 13px;
+}
+/* 内部滚动到底时不把滚动传给页面 */
+.nsh-scope .nsh-scroll,
+.nsh-scope [class*='-grid'],
+.nsh-picker-pop,
+.nsh-mask {
+  overscroll-behavior: contain;
+}
+/* 弹窗打开时锁定页面滚动 */
+html.nsh-scroll-lock,
+html.nsh-scroll-lock body {
+  overflow: hidden !important;
+}
+.nsh-scroll::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.nsh-scroll::-webkit-scrollbar-thumb {
+  background: var(--nsh-border);
+  border-radius: 3px;
+}
+
+/* 帖子内图片悬浮「收藏为表情」按钮 */
+.nsh-collect-btn {
+  position: fixed;
+  z-index: 99990;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: var(--nsh-radius);
+  border: none;
+  background: rgba(0, 0, 0, 0.62);
+  color: #fff;
+  font-size: 12px;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: background 0.15s, opacity 0.15s;
+}
+.nsh-collect-btn:hover {
+  background: #2ea44f;
+}
+
+/* 顶部导航入口 */
+.nsh-head-entry {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  margin: 0 4px;
+  border-radius: 50%;
+  font-size: 20px;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.2s;
+}
+.nsh-head-entry:hover {
+  background: rgba(0, 0, 0, 0.06);
+  transform: rotate(20deg) scale(1.08);
+}
+.dark-layout .nsh-head-entry:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* ========== 右下角快捷按钮（与原生 .nav-item-btn 同款） ========== */
+#nsh-fast-nav {
+  position: fixed;
+  right: calc(50% - 590px);
+  bottom: 40px;
+  z-index: 99;
+}
+@media (max-width: 1200px) {
+  #nsh-fast-nav {
+    right: 16px;
+  }
+}
+.nav-item-btn.nsh-fast-btn {
+  display: flex !important;
+  position: absolute;
+  right: 0;
+  cursor: pointer;
+  transition: bottom 0.2s ease;
+}
+.nsh-fast-btn .nsh-helper-icon {
+  width: 20px;
+  height: 20px;
+  color: rgb(153, 153, 153);
+  transition: color 0.15s, transform 0.2s;
+}
+.nsh-fast-btn:hover .nsh-helper-icon,
+.nsh-fast-btn.open .nsh-helper-icon {
+  color: var(--main-color, #2ea44f);
+  transform: rotate(-8deg) scale(1.08);
+}
+.nsh-fast-menu {
+  display: none;
+  position: absolute;
+  right: 38px;
+  bottom: 0;
+  min-width: 120px;
+  padding: 4px 0;
+  border-radius: 5px;
+  background: var(--bg-main-color, #fff);
+  border: 1px solid var(--glass-color, rgba(0, 0, 0, 0.05));
+  box-shadow: rgba(0, 0, 0, 0.3) 0 0 10px;
+}
+.nsh-fast-btn.open .nsh-fast-menu {
+  display: block;
+}
+.nsh-fast-menu-item {
+  padding: 0 14px;
+  line-height: 32px;
+  font-size: 13px;
+  white-space: nowrap;
+  color: var(--text-color, #333);
+  cursor: pointer;
+}
+.nsh-fast-menu-item:hover {
+  background: var(--glass-color, rgba(0, 0, 0, 0.05));
+  color: var(--main-color, #2ea44f);
+}
