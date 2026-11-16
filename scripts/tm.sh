@@ -48,6 +48,14 @@ print(v if isinstance(v,str) else json.dumps(v))'
 
 open_tab() { osascript -e "tell application \"Arc\" to tell front window to make new tab with properties {URL:\"$1\"}" >/dev/null; }
 
+# 记住执行前用户所在的标签页，结束时切回，尽量不打扰正在浏览的页面
+ORIG_TAB_ID=""
+remember_tab() { ORIG_TAB_ID=$(osascript -e 'tell application "Arc" to get id of active tab of front window' 2>/dev/null || true); }
+restore_tab() {
+  [ -n "$ORIG_TAB_ID" ] || return 0
+  osascript -e "tell application \"Arc\" to tell front window to select (first tab whose id is \"$ORIG_TAB_ID\")" >/dev/null 2>&1 || true
+}
+
 close_tabs() {
   # 倒序遍历：关闭标签后下标会前移
   osascript <<EOF >/dev/null
@@ -122,6 +130,9 @@ cmd_install() {
   close_tabs "$url"
   echo "已${label}：$url"
 }
+
+remember_tab
+trap restore_tab EXIT
 
 case "${1:-}" in
   list) cmd_list ;;
