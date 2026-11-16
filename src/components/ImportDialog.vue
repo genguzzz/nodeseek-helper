@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { activeHost, addStickers, importBackup, parseImportText, stickerData, uid } from '../core/store';
 import { maybeCompress, uploadFile } from '../core/uploaders';
 import { classifyLink, rehostImage } from '../core/collect';
@@ -8,6 +8,19 @@ import { toast } from '../core/ui';
 import StickerThumb from './StickerThumb.vue';
 
 const props = defineProps<{ defaultGroup: string }>();
+
+/* 切换标签时内容高度不同：对话框固定在顶部，内容区高度做平滑过渡，避免整体跳动 */
+const bodyInner = ref<HTMLElement>();
+const bodyHeight = ref<string>('auto');
+let ro: ResizeObserver | null = null;
+onMounted(() => {
+  if (!bodyInner.value) return;
+  ro = new ResizeObserver(() => {
+    if (bodyInner.value) bodyHeight.value = `${bodyInner.value.offsetHeight}px`;
+  });
+  ro.observe(bodyInner.value);
+});
+onBeforeUnmount(() => ro?.disconnect());
 const emit = defineEmits<{ close: []; done: [groupId: string] }>();
 
 type Mode = 'text' | 'files' | 'backup';
@@ -135,7 +148,8 @@ async function onBackupFile(list: FileList | null): Promise<void> {
         <button class="nsh-btn ghost sm" :disabled="uploading" @click="emit('close')">✕</button>
       </div>
 
-      <div class="nsh-dialog-body nsh-scroll">
+      <div class="nsh-dialog-body-wrap" :style="{ height: bodyHeight }">
+      <div ref="bodyInner" class="nsh-dialog-body nsh-scroll">
         <div v-if="mode !== 'backup'" class="nsh-import-group">
           <span>导入到</span>
           <select v-model="groupId" class="nsh-select">
@@ -200,6 +214,7 @@ async function onBackupFile(list: FileList | null): Promise<void> {
         </template>
       </div>
 
+      </div>
       <div v-if="mode !== 'backup'" class="nsh-dialog-foot">
         <button class="nsh-btn" :disabled="uploading" @click="emit('close')">取消</button>
         <button v-if="mode === 'text'" class="nsh-btn primary" :disabled="!parsed.length || uploading" @click="importText">
@@ -220,9 +235,14 @@ async function onBackupFile(list: FileList | null): Promise<void> {
   z-index: 5;
   background: rgba(0, 0, 0, 0.25);
   display: flex;
-  align-items: center;
+  /* 固定在顶部：切换标签只改变向下的高度，标题与标签栏位置不动 */
+  align-items: flex-start;
   justify-content: center;
-  padding: 20px;
+  padding: 40px 20px 20px;
+}
+.nsh-dialog-body-wrap {
+  overflow: hidden;
+  transition: height 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 .nsh-dialog {
   width: 100%;
@@ -270,6 +290,7 @@ async function onBackupFile(list: FileList | null): Promise<void> {
 .nsh-dialog-body {
   padding: 14px;
   overflow-y: auto;
+  max-height: calc(100vh - 260px);
 }
 .nsh-import-group {
   display: flex;
