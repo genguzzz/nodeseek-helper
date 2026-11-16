@@ -344,3 +344,12 @@ html.nsh-hide-native-exp .md-editor .expression,
 html.nsh-hide-native-exp .md-editor .exp-container {
   display: none !important;
 }
+
+/* iOS Safari：聚焦字号小于 16px 的输入框会自动放大页面且不复原，导致面板被放大、右侧被裁切。触摸设备上输入控件统一 16px */
+@media (hover: none) and (pointer: coarse) {
+  .nsh-mask :is(input, select, textarea):not([type='checkbox']):not([type='radio']):not([type='range']),
+  .nsh-sheet :is(input, select, textarea),
+  .nsh-picker-pop :is(input, select, textarea) {
+    font-size: 16px !important;
+  }
+}

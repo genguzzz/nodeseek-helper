@@ -185,7 +185,8 @@ html.nsh-sheet-lock body {
   right: 0;
   bottom: 0;
   z-index: 99990;
-  max-height: 62dvh;
+  /* 固定高度：切换分组时抽屉不随内容多少跳动 */
+  height: min(62dvh, 520px);
   display: flex;
   flex-direction: column;
   border-radius: 14px 14px 0 0;
@@ -242,6 +243,7 @@ html.nsh-sheet-lock body {
   flex: 1;
   min-height: 0;
   max-height: none;
+  align-content: start;
   grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
   -webkit-overflow-scrolling: touch;
 }

@@ -61,13 +61,13 @@ export async function open(env: Envelope, passphrase: string): Promise<SyncDocum
   if (env.format !== ENVELOPE_FORMAT) throw new Error(`不支持的同步数据格式：${String(env.format)}`);
   let bytes = fromB64(env.data);
   if (env.enc === 'aes-256-gcm') {
-    if (!passphrase) throw new PassphraseError('远端数据已加密，请填写同步口令');
+    if (!passphrase) throw new PassphraseError('远端数据已加密：请在已同步的设备上打开「同步」页点「复制接入码」，粘贴到本设备的同步码输入框');
     if (!env.kdf || !env.iv) throw new Error('加密信封缺少参数');
     const key = await deriveKey(passphrase, fromB64(env.kdf.salt), env.kdf.iter);
     try {
       bytes = new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: fromB64(env.iv) }, key, bytes));
     } catch {
-      throw new PassphraseError('同步口令错误，无法解密远端数据');
+      throw new PassphraseError('加密口令与其他设备不一致，无法解密远端数据。请在已同步的设备上打开「同步」页复制「接入码」，粘贴到本设备');
     }
   }
   if (env.zip === 'gzip') bytes = await pipe(bytes, new DecompressionStream('gzip'));

@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { GM_setClipboard } from '$';
-import { resetSyncCursor, syncConfig, syncNow, syncState } from '../sync/engine';
-import { decodeSyncCode } from '../sync/sync-code';
+import { resetSyncCursor, restartSync, syncConfig, syncNow, syncState } from '../sync/engine';
+import { decodeSyncCode, encodeSyncCode, looksLikeSyncCode } from '../sync/sync-code';
 import { onedrivePollLogin, onedriveStartLogin, syncProviderById, syncProviders, type DeviceCode } from '../sync/providers';
 import { toast } from '../core/ui';
 
@@ -30,15 +30,18 @@ function applyCode(): void {
   const raw = codeInput.value.trim();
   if (!raw) return;
   try {
-    const { base, token } = decodeSyncCode(raw);
+    const { base, token, passphrase } = decodeSyncCode(raw);
+    if (passphrase) syncConfig.passphrase = passphrase;
     if (syncConfig.provider !== 'selfhost') syncConfig.provider = 'selfhost';
     const v = (syncConfig.values.selfhost ??= {});
     v.base = base;
     v.token = token;
     codeInput.value = '';
     resetSyncCursor();
-    toast('同步码已识别，正在同步', 'success');
-    void syncNow('manual');
+    manual.value = false;
+    passphraseBefore = syncConfig.passphrase;
+    toast(passphrase ? '接入码已识别（含加密口令），正在同步' : '同步码已识别，正在同步', 'success');
+    restartSync();
   } catch (e) {
     codeError.value = (e as Error).message;
   }
@@ -52,8 +55,26 @@ function choose(id: string): void {
 }
 
 function onPassphraseChange(): void {
+  // 同步码 / 接入码误粘贴到口令框：按同步码处理，口令框还原
+  if (looksLikeSyncCode(syncConfig.passphrase)) {
+    codeInput.value = syncConfig.passphrase;
+    syncConfig.passphrase = passphraseBefore;
+    toast('这是同步码，已按同步码处理；加密口令需与其他设备保持一致', 'info', 4000);
+    applyCode();
+    return;
+  }
+  passphraseBefore = syncConfig.passphrase;
   // 口令变化后下次推送用新口令重新加密
   resetSyncCursor();
+}
+let passphraseBefore = syncConfig.passphrase;
+
+/** 已配置的设备生成接入码（地址 + 令牌 + 加密口令），新设备粘贴一次即可 */
+const canShare = computed(() => syncConfig.provider === 'selfhost' && !!syncConfig.values.selfhost?.base && !!syncConfig.values.selfhost?.token);
+function copyJoinCode(): void {
+  const v = syncConfig.values.selfhost ?? {};
+  GM_setClipboard(encodeSyncCode(v.base ?? '', v.token ?? '', syncConfig.passphrase), 'text');
+  toast(syncConfig.passphrase ? '接入码已复制（含加密口令），在新设备的同步码输入框粘贴即可' : '接入码已复制', 'success', 4000);
 }
 
 /* OneDrive 设备代码登录 */
@@ -117,7 +138,7 @@ function disable(): void {
         />
         <div v-if="codeError" class="nsh-help nsh-code-error">{{ codeError }}</div>
         <div v-else-if="configuredHost" class="nsh-help">已配置：{{ configuredHost }}，粘贴新的同步码可替换</div>
-        <div v-else class="nsh-help">服务端设置 NSH_PUBLIC_URL 后启动日志会打印同步码，或运行 nsh-sync-server code &lt;地址&gt; &lt;令牌&gt;</div>
+        <div v-else class="nsh-help">已有设备在同步：在那台设备的「同步」页点「复制接入码」（含加密口令），粘贴到这里即可。首次使用请粘贴服务端日志打印的同步码</div>
         <a href="javascript:void(0)" class="nsh-link nsh-mode-switch" @click="manual = true">没有同步码？选择其他方式 / 手动填写地址和令牌</a>
       </div>
     </div>
@@ -187,7 +208,7 @@ function disable(): void {
                 v-model="syncConfig.passphrase"
                 class="nsh-input"
                 :type="reveal.pass ? 'text' : 'password'"
-                placeholder="强烈建议设置：图床密钥会以密文存放在同步后端"
+                placeholder="自定义口令（不是同步码），各设备需相同"
                 autocomplete="new-password"
                 @change="onPassphraseChange"
               />
@@ -226,6 +247,7 @@ function disable(): void {
       </div>
       <div class="nsh-io-actions">
         <button class="nsh-btn primary" :disabled="syncState.running" @click="syncNow('manual')">立即同步</button>
+        <button v-if="canShare" class="nsh-btn" title="复制包含服务地址、令牌与加密口令的接入码，用于新设备一键接入" @click="copyJoinCode">复制接入码</button>
         <span class="nsh-spacer" />
         <button class="nsh-btn ghost sm danger" @click="disable">停用同步</button>
       </div>

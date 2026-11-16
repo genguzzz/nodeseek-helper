@@ -2,7 +2,10 @@
  * 同步码：把自建同步服务的「访问地址 + 令牌」编码成一个字符串，用户只需粘贴一次。
  * 由服务端生成（启动日志 / `nsh-sync-server code` 子命令），客户端解析。
  *
- *   nsh1_<base64url( mask( utf8(地址) 0x00 utf8(令牌) ‖ 校验 2 字节 ) )>
+ *   nsh1_<base64url( mask( utf8(地址) 0x00 utf8(令牌) [0x00 utf8(加密口令)] ‖ 校验 2 字节 ) )>
+ *
+ * - 服务端生成的同步码只含地址与令牌；已配置好的设备可在「同步」页复制「接入码」，额外带上加密口令，
+ *   新设备粘贴一次即可解密已有数据（口令段可选，旧同步码照常解析）
  *
  * - 校验：FNV-1a 32 位的低 16 位（大端），用于发现复制不全 / 手误
  * - 混淆：与固定密钥循环异或，再叠加按位置变化的字节，避免地址与令牌明文可读
@@ -38,16 +41,23 @@ const fromB64url = (s: string): Uint8Array => {
   return Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
 };
 
-export function encodeSyncCode(base: string, token: string): string {
+export function encodeSyncCode(base: string, token: string, passphrase = ''): string {
   const enc = new TextEncoder();
-  const plain = new Uint8Array([...enc.encode(base.trim().replace(/\/+$/, '')), 0, ...enc.encode(token.trim())]);
+  const parts = [...enc.encode(base.trim().replace(/\/+$/, '')), 0, ...enc.encode(token.trim())];
+  if (passphrase) parts.push(0, ...enc.encode(passphrase));
+  const plain = new Uint8Array(parts);
   return SYNC_CODE_PREFIX + toB64url(mask(new Uint8Array([...plain, ...fnv16(plain)])));
 }
 
 export interface SyncCodeParts {
   base: string;
   token: string;
+  /** 接入码附带的加密口令；服务端生成的同步码没有 */
+  passphrase?: string;
 }
+
+/** 看起来像同步码（用于在口令框等位置识别误粘贴） */
+export const looksLikeSyncCode = (s: string): boolean => s.trim().startsWith(SYNC_CODE_PREFIX) && s.trim().length > 20;
 
 /** 解析同步码；格式不对或校验失败抛出带中文说明的错误 */
 export function decodeSyncCode(code: string): SyncCodeParts {
@@ -67,7 +77,10 @@ export function decodeSyncCode(code: string): SyncCodeParts {
   if (sep < 1) throw new Error('同步码内容无效');
   const dec = new TextDecoder();
   const base = dec.decode(plain.slice(0, sep));
-  const token = dec.decode(plain.slice(sep + 1));
+  const rest = plain.slice(sep + 1);
+  const sep2 = rest.indexOf(0);
+  const token = dec.decode(sep2 < 0 ? rest : rest.slice(0, sep2));
+  const passphrase = sep2 < 0 ? undefined : dec.decode(rest.slice(sep2 + 1));
   if (!/^https?:\/\//.test(base) || !token) throw new Error('同步码内容无效');
-  return { base, token };
+  return passphrase ? { base, token, passphrase } : { base, token };
 }

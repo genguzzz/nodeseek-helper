@@ -55,6 +55,10 @@ export function resetSyncCursor(): void {
   syncConfig.lastError = '';
 }
 
+/** 实时同步失败后的退避区间：5 秒起，翻倍到 5 分钟 */
+const WATCH_BACKOFF_MIN = 5_000;
+const WATCH_BACKOFF_MAX = 300_000;
+
 let applying = false;
 let queued = false;
 
@@ -92,6 +96,8 @@ export async function syncNow(reason = 'manual'): Promise<void> {
       const local = buildLocalDoc(syncConfig.meta, syncConfig.deviceId);
       let next = local;
       let remoteHash = '';
+      // 本机已设置加密口令而远端仍是明文（如先同步、后设置口令）：即使内容无变化也要重新加密推送
+      const needEncrypt = pulled.status === 'ok' && pulled.envelope?.enc === 'none' && !!syncConfig.passphrase;
       if (pulled.status === 'ok' && pulled.envelope) {
         const remote = await open(pulled.envelope, syncConfig.passphrase);
         remoteHash = docHash(remote);
@@ -106,7 +112,7 @@ export async function syncNow(reason = 'manual'): Promise<void> {
         }
       }
       const etag = pulled.status === 'notModified' ? syncConfig.lastEtag : pulled.etag;
-      const needPush = pulled.status === 'empty' || (pulled.status === 'notModified' ? syncState.dirty : docHash(next) !== remoteHash);
+      const needPush = pulled.status === 'empty' || needEncrypt || (pulled.status === 'notModified' ? syncState.dirty : docHash(next) !== remoteHash);
       if (!needPush) {
         syncConfig.lastEtag = etag ?? '';
         break;
@@ -166,14 +172,27 @@ async function watchLoop(): Promise<void> {
   if (!p?.watch || !enabled() || document.hidden) return;
   const ctrl = new AbortController();
   watchAbort = ctrl;
+  let backoff = WATCH_BACKOFF_MIN;
+  const pause = (ms: number): Promise<void> =>
+    new Promise((r) => {
+      const t = window.setTimeout(r, ms);
+      ctrl.signal.addEventListener('abort', () => (clearTimeout(t), r()), { once: true });
+    });
   while (!ctrl.signal.aborted && enabled() && !document.hidden) {
+    const started = Date.now();
     try {
       if (!syncConfig.lastEtag) await syncNow('watch');
+      // 同步失败（口令错误、限流、认证失败等）时不进入长轮询，按指数退避等待，避免死循环刷请求
+      if (syncConfig.lastError || !syncConfig.lastEtag) throw new Error(syncConfig.lastError || 'no etag');
       const changed = await p.watch(valuesOf(p.id), syncConfig.lastEtag, ctrl.signal);
       if (ctrl.signal.aborted) break;
       if (changed) await syncNow('watch');
+      backoff = WATCH_BACKOFF_MIN;
+      // 兜底：一轮结束得太快（异常响应）时至少间隔 1 秒
+      if (Date.now() - started < 1000) await pause(1000);
     } catch {
-      await new Promise((r) => setTimeout(r, 30_000));
+      await pause(backoff);
+      backoff = Math.min(backoff * 2, WATCH_BACKOFF_MAX);
     }
   }
 }
@@ -184,6 +203,12 @@ function schedule(): void {
   if (!enabled()) return;
   intervalTimer = window.setInterval(() => !document.hidden && void syncNow('interval'), Math.max(1, syncConfig.intervalMin) * 60_000);
   void syncNow('startup').then(() => void watchLoop());
+}
+
+/** 同步配置变化后（如粘贴了新的同步码）立即重新同步，并结束正在退避等待的实时同步 */
+export function restartSync(): void {
+  if (enabled()) schedule();
+  else void syncNow('manual');
 }
 
 export function startAutoSync(): void {

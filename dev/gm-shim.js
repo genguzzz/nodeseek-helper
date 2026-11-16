@@ -25,7 +25,7 @@
     for (const [k, v] of Object.entries(d.headers || {})) x.setRequestHeader(k, v);
     if (d.upload?.onprogress) x.upload.onprogress = d.upload.onprogress;
     x.timeout = d.timeout || 0;
-    x.onload = () => d.onload?.({ status: x.status, responseText: x.responseText });
+    x.onload = () => d.onload?.({ status: x.status, responseText: x.responseText, responseHeaders: x.getAllResponseHeaders() });
     x.onerror = () => d.onerror?.({});
     x.ontimeout = () => d.ontimeout?.({});
     x.send(d.data);

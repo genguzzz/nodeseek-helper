@@ -108,7 +108,10 @@ const selfhost: SyncProvider = {
   async watch(v, etag, signal) {
     if (signal.aborted) return false;
     const r = await http('GET', `${trimBase(v.base)}/v1/sync/watch?etag=${encodeURIComponent(etag)}&timeout=25`, { Authorization: `Bearer ${v.token}` }, undefined, 35_000);
-    return r.status === 200;
+    if (r.status === 200) return true;
+    if (r.status === 304) return false;
+    // 限流 / 认证失败 / 服务异常：抛出让调用方退避，不能当作「无变化」立刻重连
+    throw new Error(`实时同步：HTTP ${r.status}`);
   },
 };
 
