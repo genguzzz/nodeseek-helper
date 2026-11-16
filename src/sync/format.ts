@@ -44,6 +44,7 @@ export const SYNCED_SETTING_KEYS = [
   'maxWidth',
   'collectFromPost',
   'freezeAnimated',
+  'touchAutoplay',
   'hoverPreview',
   'pickerDefaultTab',
   'showUploadButton',

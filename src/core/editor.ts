@@ -57,9 +57,12 @@ function injectToolbar(md: Element, cm: CM): void {
   ref ? ref.after(btn, emoji) : bar.append(btn, emoji);
 }
 
-function insertText(cm: CM, text: string): void {
+/**
+ * 插入到光标处。focus=false 时不把焦点拉回编辑器（底部表情栏与原生表情一致：手机上点表情不会弹出输入法）。
+ */
+function insertText(cm: CM, text: string, focus = true): void {
   cm.replaceSelection(text);
-  cm.focus();
+  if (focus) cm.focus();
 }
 
 function injectTopButtons(md: Element, cm: CM): void {
@@ -117,7 +120,7 @@ function injectNativeBar(md: HTMLElement, cm: CM): void {
   panel.className = 'nsh-scope nsh-exp-host';
   const container = bar.parentElement?.querySelector(':scope > .exp-container');
   (container ?? bar).after(panel);
-  const app = createApp(InlineStickers, { bar, tabsHost, toolsHost, insert: (text: string) => insertText(cm, text) });
+  const app = createApp(InlineStickers, { bar, tabsHost, toolsHost, insert: (text: string) => insertText(cm, text, false) });
   app.mount(panel);
   inlineApps.set(md, { app, panel, bar });
 }

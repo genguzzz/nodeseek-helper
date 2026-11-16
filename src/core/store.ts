@@ -24,6 +24,8 @@ export interface Settings {
   collectFromPost: boolean;
   /** 选择面板里动图默认静止，悬浮时播放 */
   freezeAnimated: boolean;
+  /** 触屏设备：动图在可见时直接播放，不弹预览大图（触屏没有悬浮，点按会误触预览） */
+  touchAutoplay: boolean;
   /** 界面入口开关 */
   showUploadButton: boolean;
   showStickerButton: boolean;
@@ -97,6 +99,7 @@ const defaultSettings = (): Settings => ({
   maxWidth: 0,
   collectFromPost: true,
   freezeAnimated: true,
+  touchAutoplay: true,
   showUploadButton: true,
   showStickerButton: true,
   showFastNav: true,

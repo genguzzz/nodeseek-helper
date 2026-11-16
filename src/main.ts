@@ -1,3 +1,5 @@
+// 必须最先导入：顶部图标在其他重模块执行之前就开始注入
+import { onHeaderEntryClick } from './header-entry';
 import { createApp, watchEffect } from 'vue';
 import { GM_registerMenuCommand } from '$';
 import './styles.css';
@@ -9,7 +11,6 @@ import { collectSticker } from './core/collect';
 import { startAutoSync } from './sync/engine';
 import { loadOfficialStickers } from './core/official';
 import { openPanel } from './core/ui';
-import { HANABI_ICON_MONO } from './core/packs';
 
 function mountApp(): void {
   const host = document.createElement('div');
@@ -17,36 +18,6 @@ function mountApp(): void {
   host.className = 'nsh-scope';
   document.body.append(host);
   createApp(App).mount(host);
-}
-
-/** 顶部导航栏入口，放在主题切换按钮旁边；返回是否已就位 */
-function injectHeaderEntry(): boolean {
-  if (document.querySelector('.nsh-head-entry')) return true;
-  const anchor = document.querySelector('#nsk-head .color-theme-switcher');
-  if (!anchor) return false;
-  const btn = document.createElement('div');
-  btn.className = 'nsh-head-entry';
-  btn.title = 'NodeSeek 助手：图床与表情包';
-  btn.innerHTML = HANABI_ICON_MONO;
-  btn.addEventListener('click', () => openPanel());
-  anchor.before(btn);
-  return true;
-}
-
-/**
- * 尽早注入顶部图标：脚本在 document-start 运行，解析到主题切换按钮的那一刻同步插入，
- * 赶在首帧绘制之前，与搜索框一起出现，不会闪一下。
- */
-function injectHeaderEarly(): void {
-  if (injectHeaderEntry()) return;
-  const mo = new MutationObserver(() => {
-    if (injectHeaderEntry()) mo.disconnect();
-  });
-  mo.observe(document.documentElement, { childList: true, subtree: true });
-  document.addEventListener('DOMContentLoaded', () => {
-    injectHeaderEntry();
-    mo.disconnect();
-  }, { once: true });
 }
 
 /** 帖子里悬浮图片时出现「收藏为表情」 */
@@ -120,7 +91,7 @@ function boot(): void {
   document.documentElement.dataset.nshLoaded = '1';
   // 入口开关与顶部图标在首帧前就位
   bindEntryToggles();
-  injectHeaderEarly();
+  onHeaderEntryClick(() => openPanel());
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bootBody, { once: true });
   else bootBody();
 }

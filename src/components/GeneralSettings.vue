@@ -65,6 +65,7 @@ type BoolKey =
   | 'compress'
   | 'collectFromPost'
   | 'freezeAnimated'
+  | 'touchAutoplay'
   | 'hoverPreview'
   | 'showUploadButton'
   | 'showStickerButton'
@@ -74,13 +75,14 @@ const entryToggles: { key: BoolKey; label: string; help: string }[] = [
   { key: 'showUploadButton', label: '上传图片按钮', help: '编辑器工具栏与右上角的「云朵上传」按钮；关闭后仍可粘贴 / 拖拽上传' },
   { key: 'showStickerButton', label: '表情入口', help: '编辑器工具栏的笑脸按钮（工具栏隐藏时显示在右上角），以及底部原生表情栏前的收藏 / 最近 / 自定义分组' },
   { key: 'showFastNav', label: '右下角助手按钮', help: '回到顶部按钮上方的「助手」快捷菜单' },
-  { key: 'showHeaderEntry', label: '顶部导航图标', help: '导航栏主题切换旁的花火图标' },
+  { key: 'showHeaderEntry', label: '顶部导航图标', help: '导航栏主题切换旁的笑脸贴纸图标' },
 ];
 const toggles: { key: BoolKey; label: string; help: string }[] = [
   { key: 'pasteUpload', label: '粘贴图片自动上传', help: '在回复 / 发帖编辑器中 Ctrl+V 截图或图片时自动上传并插入' },
   { key: 'dropUpload', label: '拖拽图片自动上传', help: '把图片文件拖进编辑器即可上传' },
-  { key: 'hoverPreview', label: '表情悬浮预览', help: '鼠标悬浮表情时显示大图；移动端长按预览' },
-  { key: 'freezeAnimated', label: '动图静止，悬浮播放', help: '表情面板中 GIF / 动态 WebP 默认显示首帧，鼠标悬浮时才播放，面板更清爽' },
+  { key: 'hoverPreview', label: '表情悬浮预览', help: '鼠标悬浮表情时显示大图' },
+  { key: 'freezeAnimated', label: '动图静止，悬浮播放', help: '电脑上表情面板中 GIF / 动态 WebP 默认显示首帧，鼠标悬浮时才播放，面板更清爽' },
+  { key: 'touchAutoplay', label: '触屏设备动图直接播放', help: '手机 / 平板上可见区域内的动图直接播放，与 AC娘、小黄鸡等原生表情一致，点选表情不再弹出预览大图；关闭则恢复长按预览' },
   { key: 'collectFromPost', label: '帖子图片一键收藏', help: '浏览帖子时悬浮图片，右上角出现「收藏为表情」按钮' },
   { key: 'compress', label: '上传前压缩', help: '在浏览器端缩放并转码后再上传（GIF 不处理）' },
 ];

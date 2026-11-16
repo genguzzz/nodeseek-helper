@@ -251,25 +251,7 @@ html.nsh-scroll-lock body {
 }
 
 /* 顶部导航入口 */
-.nsh-head-entry {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 30px;
-  margin: 0 4px;
-  border-radius: 50%;
-  font-size: 20px;
-  cursor: pointer;
-  transition: background 0.15s, transform 0.2s;
-}
-.nsh-head-entry:hover {
-  background: rgba(0, 0, 0, 0.06);
-  transform: rotate(20deg) scale(1.08);
-}
-.dark-layout .nsh-head-entry:hover {
-  background: rgba(255, 255, 255, 0.08);
-}
+/* 顶部导航图标的布局是行内样式（见 src/header-entry.ts），这里只有显隐开关 */
 
 /* ========== 右下角快捷按钮（与原生 .nav-item-btn 同款） ========== */
 #nsh-fast-nav {

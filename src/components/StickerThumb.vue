@@ -10,6 +10,13 @@ const props = withDefaults(defineProps<{ url: string; name?: string; size?: numb
   preview: true,
 });
 
+/**
+ * 触屏设备没有悬浮：点按会被模拟成 mouseenter，随后弹出预览大图「闪一下」。
+ * 开启 touchAutoplay 时触屏上不做任何预览，动图直接播放（只加载可视区附近的，见下方 IntersectionObserver）。
+ */
+const isTouch = window.matchMedia('(hover: none)').matches;
+const touchPlay = computed(() => isTouch && settings.touchAutoplay);
+
 const root = ref<HTMLElement>();
 const canvas = ref<HTMLCanvasElement>();
 const hovering = ref(false);
@@ -102,7 +109,7 @@ watch(
 
 /** 动图静止：把首帧画到 canvas 上，悬浮时再显示原图播放 */
 function onLoad(e: Event): void {
-  if (!settings.freezeAnimated || !animated.value || !canvas.value) return;
+  if (touchPlay.value || !settings.freezeAnimated || !animated.value || !canvas.value) return;
   const img = e.target as HTMLImageElement;
   const c = canvas.value;
   const ratio = Math.min(1, (props.size * 2) / Math.max(img.naturalWidth, img.naturalHeight));
@@ -117,6 +124,8 @@ function onLoad(e: Event): void {
 }
 
 function enter(): void {
+  // 触屏上的 mouseenter 是点按模拟出来的，不当作悬浮
+  if (isTouch) return;
   hovering.value = true;
   if (!props.preview || !settings.hoverPreview) return;
   timer = window.setTimeout(() => root.value && showPreview(root.value, props.url, props.name, props.video), 260);
@@ -128,11 +137,12 @@ function leave(): void {
   hidePreview();
 }
 
-/** 移动端长按预览：长按出预览后松手不触发点击；滑动列表时取消长按 */
+/** 触屏长按预览（关闭「触屏设备动图直接播放」时）：长按出预览后松手不触发点击；滑动列表时取消长按 */
 let pressTimer = 0;
 let pressed = false;
 function touchStart(): void {
   pressed = false;
+  if (touchPlay.value || !props.preview) return;
   pressTimer = window.setTimeout(() => {
     if (!root.value) return;
     pressed = true;
@@ -164,7 +174,7 @@ onBeforeUnmount(() => {
   <div
     ref="root"
     class="nsh-thumb"
-    :class="{ playing: hovering || !frozen, failed }"
+    :class="{ playing: hovering || !frozen || touchPlay, failed }"
     :style="{ width: size + 'px', height: size + 'px' }"
     @mouseenter="enter"
     @mouseleave="leave"

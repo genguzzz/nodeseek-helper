@@ -35,6 +35,3 @@ export const builtinPacks: BuiltinPack[] = [
     `),
   },
 ];
-
-/** 单色版本，用于顶部导航（与站点日/夜间图标同色） */
-export const HANABI_ICON_MONO = HANABI_ICON.replace(/url\(#nshHanabi\)/g, 'currentColor').replace(/<defs>.*?<\/defs>/, '');
