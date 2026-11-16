@@ -243,7 +243,6 @@ async function test(): Promise<void> {
 <style>
 .nsh-hosts {
   display: flex;
-  height: 100%;
   min-height: 0;
 }
 .nsh-host-list {
@@ -318,8 +317,9 @@ async function test(): Promise<void> {
   margin-top: 6px;
 }
 .nsh-host-main {
-  flex: 1;
+  flex: 1 1 auto;
   min-width: 0;
+  min-height: 0;
   padding: 18px 22px;
   overflow-y: auto;
 }

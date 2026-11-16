@@ -202,7 +202,7 @@ docs/          同步协议
 
 ### 发布
 
-推送 `v*` 标签后，GitHub Actions 会构建全部产物（发布构建对 `user.js` / `inject.js` 做 JS 混淆，保留油猴头部；本地 `npm run build` 默认不混淆，设 `NSH_OBFUSCATE=1` 开启）（设置 `NSH_PUBLISH_BASE` 为 Release 下载地址）、多平台服务端二进制与多架构 Docker 镜像（`ghcr.io/genguzzz/nodeseek-helper-sync`），并创建 Release。
+推送 `v*` 标签后，GitHub Actions 会构建全部产物（`user.js` / `inject.js` 均经 esbuild 压缩，不做混淆，避免拖慢加载与运行）（设置 `NSH_PUBLISH_BASE` 为 Release 下载地址）、多平台服务端二进制与多架构 Docker 镜像（`ghcr.io/genguzzz/nodeseek-helper-sync`），并创建 Release。
 
 ## 许可
 

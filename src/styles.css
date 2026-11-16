@@ -216,6 +216,9 @@ html.nsh-scroll-lock,
 html.nsh-scroll-lock body {
   overflow: hidden !important;
 }
+.nsh-scope .nsh-scroll {
+  -webkit-overflow-scrolling: touch;
+}
 .nsh-scroll::-webkit-scrollbar {
   width: 6px;
   height: 6px;

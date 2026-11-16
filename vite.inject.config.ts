@@ -1,6 +1,9 @@
 import { defineConfig, type Plugin } from 'vite';
 import vue from '@vitejs/plugin-vue';
 import { fileURLToPath } from 'node:url';
+import fs from 'node:fs';
+
+const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8')) as { version: string };
 
 /** 把抽出的 CSS 内联进 JS（注入版只有一个文件） */
 function inlineCss(): Plugin {
@@ -27,7 +30,7 @@ export default defineConfig({
   resolve: {
     alias: { $: fileURLToPath(new URL('./src/platform/web.ts', import.meta.url)) },
   },
-  define: { 'process.env.NODE_ENV': '"production"' },
+  define: { 'process.env.NODE_ENV': '"production"', __NSH_VERSION__: JSON.stringify(pkg.version) },
   build: {
     emptyOutDir: false,
     cssCodeSplit: false,

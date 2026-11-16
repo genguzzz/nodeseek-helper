@@ -33,7 +33,7 @@ function http(method: string, url: string, headers: Record<string, string> = {},
   });
 }
 
-const trimBase = (u: string): string => u.trim().replace(/\/+$/, '');
+const trimBase = (u: string | undefined): string => (u ?? '').trim().replace(/\/+$/, '');
 
 export class ConflictError extends Error {
   constructor() {
@@ -160,7 +160,7 @@ const webdav: SyncProvider = {
 };
 
 function fileUrl(v: Values): string {
-  const base = v.base.trim().replace(/\/*$/, '/');
+  const base = (v.base ?? '').trim().replace(/\/*$/, '/');
   return encodeURI(decodeURI(base)) + SYNC_FILE;
 }
 
@@ -308,6 +308,11 @@ const onedrive: SyncProvider = {
   },
   updates: (v) => (v.refreshToken ? { refreshToken: v.refreshToken } : undefined),
 };
+
+/** 返回缺失的必填项名称；全部填写时返回空数组 */
+export function missingFields(p: SyncProvider, v: Values): string[] {
+  return p.fields.filter((f) => f.required && !(v[f.key] ?? '').trim()).map((f) => f.label);
+}
 
 export const syncProviders: SyncProvider[] = [selfhost, webdav, gist, onedrive];
 export const syncProviderById = (id: string): SyncProvider | undefined => syncProviders.find((p) => p.id === id);

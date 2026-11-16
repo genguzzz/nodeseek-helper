@@ -7,6 +7,9 @@ import StickerThumb from './StickerThumb.vue';
 import GroupIcon from './GroupIcon.vue';
 import ImportDialog from './ImportDialog.vue';
 
+/** 触摸设备上关闭 HTML5 拖拽排序：iOS 上 draggable 元素长按会进入拖拽，干扰列表滑动 */
+const pointerDrag: boolean = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+
 type View = 'all' | 'fav' | 'recent' | string;
 type SortKey = 'manual' | 'used' | 'recent' | 'created' | 'name';
 
@@ -246,7 +249,7 @@ const defaultImportGroup = computed(() => (currentGroup.value ? currentGroup.val
         :key="g.id"
         class="nsh-sm-nav"
         :class="{ active: view === g.id, 'drop-hint': dragOver === 'g:' + g.id }"
-        draggable="true"
+        :draggable="pointerDrag"
         @click="view = g.id"
         @dragstart="onGroupDragStart($event, g)"
         @dragover="onGroupDragOver($event, g)"
@@ -316,7 +319,7 @@ const defaultImportGroup = computed(() => (currentGroup.value ? currentGroup.val
           :key="s.id"
           class="nsh-sm-card"
           :class="{ selected: selected.has(s.id), selecting, 'drop-hint': dragOver === 's:' + s.id }"
-          draggable="true"
+          :draggable="pointerDrag"
           @click="clickCard(s)"
           @dragstart="onCardDragStart($event, s)"
           @dragover="onCardDragOver($event, s)"
@@ -373,7 +376,6 @@ const defaultImportGroup = computed(() => (currentGroup.value ? currentGroup.val
 .nsh-sm {
   position: relative;
   display: flex;
-  height: 100%;
   min-height: 0;
 }
 .nsh-sm-side {
@@ -481,8 +483,9 @@ const defaultImportGroup = computed(() => (currentGroup.value ? currentGroup.val
   padding: 0 6px;
 }
 .nsh-sm-main {
-  flex: 1;
+  flex: 1 1 auto;
   min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
 }
@@ -499,12 +502,12 @@ const defaultImportGroup = computed(() => (currentGroup.value ? currentGroup.val
   background: var(--nsh-accent-soft);
   padding: 6px 14px;
 }
-.nsh-sm-search {
+.nsh-sm-toolbar .nsh-sm-search {
   width: 180px;
   height: 28px;
 }
-.nsh-sm-sort,
-.nsh-sm-move {
+.nsh-sm-toolbar .nsh-sm-sort,
+.nsh-sm-bulk .nsh-sm-move {
   width: auto;
   height: 26px;
   font-size: 12px;
@@ -522,8 +525,11 @@ const defaultImportGroup = computed(() => (currentGroup.value ? currentGroup.val
   color: var(--nsh-text-sub);
 }
 .nsh-sm-grid {
-  flex: 1;
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   padding: 14px;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(108px, 1fr));
@@ -644,8 +650,8 @@ const defaultImportGroup = computed(() => (currentGroup.value ? currentGroup.val
   .nsh-sm-bulk {
     padding: 8px 10px;
   }
-  .nsh-sm-search {
-    flex: 1;
+  .nsh-sm-toolbar .nsh-sm-search {
+    flex: 1 1 100%;
     min-width: 0;
     width: auto;
   }
@@ -662,6 +668,7 @@ const defaultImportGroup = computed(() => (currentGroup.value ? currentGroup.val
   }
   .nsh-sm-side {
     width: auto;
+    flex: none;
     flex-direction: row;
     border-right: none;
     border-bottom: 1px solid var(--nsh-border);

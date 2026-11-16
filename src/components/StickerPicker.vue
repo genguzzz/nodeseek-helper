@@ -41,7 +41,23 @@ const appItems = computed(() => {
   ];
 });
 
-const tab = ref<Tab>(favList.value.length ? 'fav' : stickerData.groups.find((g) => stickerData.stickers.some((s) => s.groupId === g.id))?.id ?? `ns:${official.groups[0]?.group ?? 'ac'}`);
+/** 分组是否仍然存在（设置里记的分组可能已被删除） */
+function isValidTab(t: string): boolean {
+  if (t === 'fav' || t === 'recent') return true;
+  if (t.startsWith('ns:')) return official.groups.some((g) => `ns:${g.group}` === t);
+  return stickerData.groups.some((g) => g.id === t);
+}
+
+/** 按「默认打开」设置决定初始分组；找不到时回退到自动规则 */
+function initialTab(): Tab {
+  const pref = settings.pickerDefaultTab;
+  const wanted = pref === 'last' ? settings.pickerLastTab : pref;
+  if (wanted && wanted !== 'auto' && isValidTab(wanted)) return wanted as Tab;
+  if (favList.value.length) return 'fav';
+  return stickerData.groups.find((g) => stickerData.stickers.some((s) => s.groupId === g.id))?.id ?? `ns:${official.groups[0]?.group ?? 'ac'}`;
+}
+
+const tab = ref<Tab>(initialTab());
 const keyword = ref('');
 
 const list = computed<Sticker[]>(() => {
@@ -79,6 +95,9 @@ function onTabsWheel(e: WheelEvent): void {
 }
 
 /** 切换分组时把当前标签滚入可视区 */
+watch(tab, (t) => {
+  if (t !== 'app') settings.pickerLastTab = t;
+});
 watch(tab, () =>
   nextTick(() => {
     tabsEl.value?.querySelector('.nsh-ptab.active')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });

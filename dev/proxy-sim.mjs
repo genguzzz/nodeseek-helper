@@ -3,6 +3,8 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 
 const toHeaders = (h) => Object.fromEntries(h.entries());
+/** 模拟代理工具的持久化存储（进程内共享，跨请求保留） */
+export const simStore = new Map();
 
 export function runProxy({ scriptPath, platform, request, response }) {
   const code = fs.readFileSync(scriptPath, 'utf8');
@@ -16,6 +18,7 @@ export function runProxy({ scriptPath, platform, request, response }) {
     };
     if (response) ctx.$response = response;
     if (platform === 'qx') {
+      ctx.$prefs = { valueForKey: (k) => simStore.get(k) ?? null, setValueForKey: (v, k) => (simStore.set(k, v), true) };
       ctx.$task = {
         fetch: async (o) => {
           const r = await fetch(o.url, { method: o.method || 'GET', headers: o.headers, body: o.bodyBytes ? Buffer.from(o.bodyBytes) : o.body });
@@ -28,6 +31,7 @@ export function runProxy({ scriptPath, platform, request, response }) {
           .then(async (r) => cb(null, { status: r.status, headers: toHeaders(r.headers) }, await r.text()))
           .catch((e) => cb(String(e)));
       };
+      ctx.$persistentStore = { read: (k) => simStore.get(k) ?? null, write: (v, k) => (simStore.set(k, v), true) };
       ctx.$httpClient = { get: call('GET'), post: call('POST'), put: call('PUT') };
     }
     try {

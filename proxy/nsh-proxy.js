@@ -107,13 +107,51 @@ async function relay() {
   }
 }
 
+/* ---------- 注入脚本缓存：同一版本只从发布地址下载一次，之后直接从代理工具的持久化存储返回 ---------- */
+const CACHE_KEY = 'nsh_app_js';
+const CACHE_VER_KEY = 'nsh_app_ver';
+
+function storeRead(key) {
+  try {
+    if (isQX) return $prefs.valueForKey(key);
+    return $persistentStore.read(key);
+  } catch (e) {
+    return null;
+  }
+}
+
+function storeWrite(key, value) {
+  try {
+    if (isQX) return $prefs.setValueForKey(value, key);
+    return $persistentStore.write(value, key);
+  } catch (e) {
+    return false;
+  }
+}
+
+function sendApp(body, source) {
+  // 地址带 ?v=版本号，内容随版本不变：浏览器可长期缓存，后续页面打开不再经过代理
+  respond(200, {
+    'Content-Type': 'application/javascript; charset=utf-8',
+    'Cache-Control': source === 'stale' ? 'no-cache' : 'public, max-age=31536000, immutable',
+    'X-NSH-Relay': '1',
+    'X-NSH-Source': source,
+  }, body);
+}
+
 async function serveApp() {
+  const cached = storeRead(CACHE_VER_KEY) === NSH_VERSION ? storeRead(CACHE_KEY) : null;
+  if (cached) return sendApp(cached, 'cache');
   try {
     const res = await http({ url: `${NSH_BASE}/${APP_FILE}?v=${NSH_VERSION}`, method: 'GET', headers: {} });
-    if (res.status >= 400) throw new Error('HTTP ' + res.status);
-    respond(200, { 'Content-Type': 'application/javascript; charset=utf-8', 'Cache-Control': 'public, max-age=3600', 'X-NSH-Relay': '1' }, res.body);
+    if (res.status >= 400 || !res.body) throw new Error('HTTP ' + res.status);
+    if (storeWrite(CACHE_KEY, res.body)) storeWrite(CACHE_VER_KEY, NSH_VERSION);
+    sendApp(res.body, 'network');
   } catch (e) {
-    respond(200, { 'Content-Type': 'application/javascript; charset=utf-8' }, `console.error(${JSON.stringify('[NodeSeek 助手] 加载失败：' + String(e))});`);
+    // 新版本下载失败时退回旧缓存，保证功能可用
+    const stale = storeRead(CACHE_KEY);
+    if (stale) return sendApp(stale, 'stale');
+    respond(200, { 'Content-Type': 'application/javascript; charset=utf-8', 'Cache-Control': 'no-store' }, `console.error(${JSON.stringify('[NodeSeek 助手] 加载失败：' + String(e))});`);
   }
 }
 

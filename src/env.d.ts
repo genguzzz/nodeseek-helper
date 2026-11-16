@@ -21,3 +21,6 @@ declare module 'gifenc' {
   export function quantize(rgba: Uint8ClampedArray, maxColors: number, opts?: { format?: string; oneBitAlpha?: boolean | number }): Palette;
   export function applyPalette(rgba: Uint8ClampedArray, palette: Palette, format?: string): Uint8Array;
 }
+
+/** 构建时注入的版本号（package.json） */
+declare const __NSH_VERSION__: string;

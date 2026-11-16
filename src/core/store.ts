@@ -35,6 +35,10 @@ export interface Settings {
   officialFav: string[];
   officialUsage: Record<string, { c: number; t: number }>;
   hoverPreview: boolean;
+  /** 表情面板默认打开的分组：auto 自动（有收藏打开收藏）、last 上次使用、fav、recent、自定义分组 id、ns:官方分组 */
+  pickerDefaultTab: string;
+  /** 上次在表情面板里停留的分组（pickerDefaultTab 为 last 时使用，仅本机） */
+  pickerLastTab: string;
   /** 已写入过的内置包，用户删除后不再自动恢复 */
   seededPacks: string[];
   history: UploadRecord[];
@@ -103,6 +107,8 @@ const defaultSettings = (): Settings => ({
   officialFav: [],
   officialUsage: {},
   hoverPreview: true,
+  pickerDefaultTab: 'auto',
+  pickerLastTab: '',
   seededPacks: [],
   history: [],
 });

@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { GM_setClipboard } from '$';
-import { exportConfig, importConfig, settings } from '../core/store';
+import { exportConfig, importConfig, settings, stickerData } from '../core/store';
+import { official } from '../core/official';
+
+const VERSION: string = __NSH_VERSION__;
 import { toast } from '../core/ui';
 import { importSyncConfig, syncNow } from '../sync/engine';
 
@@ -96,6 +99,25 @@ const toggles: { key: BoolKey; label: string; help: string }[] = [
       <button class="nsh-switch" :class="{ on: settings[t.key] }" @click="settings[t.key] = !settings[t.key]" />
     </div>
 
+    <div class="nsh-row">
+      <div class="nsh-row-text">
+        <div>表情面板默认打开</div>
+        <div class="nsh-help">点开工具栏笑脸时先显示的分组；选中的分组被删除后自动回退</div>
+      </div>
+      <select v-model="settings.pickerDefaultTab" class="nsh-select nsh-default-tab">
+        <option value="auto">自动（有收藏时打开收藏）</option>
+        <option value="last">上次使用的分组</option>
+        <option value="fav">收藏</option>
+        <option value="recent">最近</option>
+        <optgroup v-if="stickerData.groups.length" label="我的分组">
+          <option v-for="g in stickerData.groups" :key="g.id" :value="g.id">{{ g.name }}</option>
+        </optgroup>
+        <optgroup v-if="official.groups.length" label="官方表情">
+          <option v-for="g in official.groups" :key="g.group" :value="'ns:' + g.group">{{ g.name }}</option>
+        </optgroup>
+      </select>
+    </div>
+
     <div v-if="settings.compress" class="nsh-sub-block">
       <div class="nsh-field">
         <label class="nsh-label">输出格式</label>
@@ -171,6 +193,7 @@ const toggles: { key: BoolKey; label: string; help: string }[] = [
     <div class="nsh-io-actions">
       <button class="nsh-btn primary" :disabled="!importText.trim()" @click="applyImport(importText)">导入粘贴的配置</button>
     </div>
+    <p class="nsh-about">NodeSeek 助手 v{{ VERSION }} · <a class="nsh-link" href="https://github.com/genguzzz/nodeseek-helper" target="_blank" rel="noopener">GitHub</a></p>
   </div>
 </template>
 
@@ -179,7 +202,6 @@ const toggles: { key: BoolKey; label: string; help: string }[] = [
   /* 滚动容器占满面板（滚动条贴右边），内容列最宽 820px 并水平居中 */
   padding: 18px max(22px, calc((100% - 820px) / 2));
   overflow-y: auto;
-  height: 100%;
 }
 .nsh-row {
   display: flex;
@@ -220,5 +242,16 @@ const toggles: { key: BoolKey; label: string; help: string }[] = [
   border-radius: 3px;
   background: var(--nsh-bg-muted);
   font-size: 12px;
+}
+.nsh-default-tab {
+  flex: none;
+  width: 200px;
+  max-width: 48%;
+}
+.nsh-about {
+  margin: 24px 0 4px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--nsh-text-faint);
 }
 </style>

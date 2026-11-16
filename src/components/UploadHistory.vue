@@ -45,7 +45,6 @@ const fmt = (t: number): string => new Date(t).toLocaleString();
 .nsh-history {
   padding: 14px max(22px, calc((100% - 820px) / 2));
   overflow-y: auto;
-  height: 100%;
 }
 .nsh-history-head {
   display: flex;

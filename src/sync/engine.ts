@@ -3,7 +3,7 @@ import { GM_getValue, GM_setValue } from '$';
 import { isApplyingRemote, settings, stickerData, uid } from '../core/store';
 import { open, PassphraseError, seal } from './crypto';
 import { applyDoc, buildLocalDoc, dedupeByUrl, docHash, mergeDocs, type SyncMeta } from './format';
-import { ConflictError, syncProviderById, type Values } from './providers';
+import { ConflictError, missingFields, syncProviderById, type Values } from './providers';
 import { decodeSyncCode } from './sync-code';
 
 /** 本机同步配置：不参与同步（含后端凭据与加密口令） */
@@ -72,6 +72,14 @@ export async function syncNow(reason = 'manual'): Promise<void> {
   syncState.running = true;
   syncState.status = '同步中…';
   const v = valuesOf(p.id);
+  const missing = missingFields(p, v);
+  if (missing.length) {
+    // 还没填完（如刚选中自建服务、尚未粘贴同步码）：提示而不是报错
+    syncState.running = false;
+    syncState.status = p.id === 'selfhost' ? '待粘贴同步码' : `待填写：${missing.join('、')}`;
+    syncConfig.lastError = '';
+    return;
+  }
   try {
     for (let attempt = 0; attempt < MAX_RETRY; attempt++) {
       const pulled = await p.pull(v, syncConfig.lastEtag || undefined);

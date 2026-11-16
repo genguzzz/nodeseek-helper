@@ -15,12 +15,13 @@ const manual = ref(false);
 const setTimeout = (fn: () => void, ms: number): number => window.setTimeout(fn, ms);
 const codeInput = ref('');
 const codeError = ref('');
-const useCode = computed(() => provider.value?.id === 'selfhost' && !manual.value);
+const useCode = computed(() => (!provider.value || provider.value.id === 'selfhost') && !manual.value);
 const configuredHost = computed(() => {
+  const base = syncConfig.provider === 'selfhost' ? syncConfig.values.selfhost?.base : '';
   try {
-    return values.value.base ? new URL(values.value.base).host : '';
+    return base ? new URL(base).host : '';
   } catch {
-    return values.value.base;
+    return base ?? '';
   }
 });
 
@@ -30,8 +31,10 @@ function applyCode(): void {
   if (!raw) return;
   try {
     const { base, token } = decodeSyncCode(raw);
-    values.value.base = base;
-    values.value.token = token;
+    if (syncConfig.provider !== 'selfhost') syncConfig.provider = 'selfhost';
+    const v = (syncConfig.values.selfhost ??= {});
+    v.base = base;
+    v.token = token;
     codeInput.value = '';
     resetSyncCursor();
     toast('同步码已识别，正在同步', 'success');
@@ -98,7 +101,29 @@ function disable(): void {
       多端同时修改按条目合并，不会整份覆盖。
     </p>
 
-    <div class="nsh-provider-grid nsh-sync-providers">
+    <!-- 默认只需粘贴同步码（自建服务）；展开「其他方式」才显示后端列表与手动填写 -->
+    <div v-if="useCode" class="nsh-field nsh-code-field">
+      <label class="nsh-label">同步码<em>*</em></label>
+      <div class="nsh-control">
+        <input
+          v-model="codeInput"
+          class="nsh-input"
+          placeholder="粘贴服务端生成的同步码（nsh1_ 开头）"
+          autocomplete="off"
+          spellcheck="false"
+          @change="applyCode"
+          @paste="setTimeout(applyCode, 0)"
+          @keydown.enter="applyCode"
+        />
+        <div v-if="codeError" class="nsh-help nsh-code-error">{{ codeError }}</div>
+        <div v-else-if="configuredHost" class="nsh-help">已配置：{{ configuredHost }}，粘贴新的同步码可替换</div>
+        <div v-else class="nsh-help">服务端设置 NSH_PUBLIC_URL 后启动日志会打印同步码，或运行 nsh-sync-server code &lt;地址&gt; &lt;令牌&gt;</div>
+        <a href="javascript:void(0)" class="nsh-link nsh-mode-switch" @click="manual = true">没有同步码？选择其他方式 / 手动填写地址和令牌</a>
+      </div>
+    </div>
+
+    <a v-if="manual" href="javascript:void(0)" class="nsh-link nsh-mode-back" @click="manual = false">← 改用同步码</a>
+    <div v-if="!useCode" class="nsh-provider-grid nsh-sync-providers">
       <button
         v-for="p in syncProviders"
         :key="p.id"
@@ -113,26 +138,6 @@ function disable(): void {
 
     <template v-if="provider">
       <div class="nsh-sync-form">
-        <!-- 自建服务默认只需粘贴同步码；「手动填写」回退到地址 + 令牌 -->
-        <div v-if="useCode" class="nsh-field">
-          <label class="nsh-label">同步码<em>*</em></label>
-          <div class="nsh-control">
-            <input
-              v-model="codeInput"
-              class="nsh-input"
-              placeholder="粘贴服务端生成的同步码（nsh1_ 开头）"
-              autocomplete="off"
-              spellcheck="false"
-              @change="applyCode"
-              @paste="setTimeout(applyCode, 0)"
-              @keydown.enter="applyCode"
-            />
-            <div v-if="codeError" class="nsh-help nsh-code-error">{{ codeError }}</div>
-            <div v-else-if="configuredHost" class="nsh-help">已配置：{{ configuredHost }}，粘贴新的同步码可替换</div>
-            <div v-else class="nsh-help">服务端设置 NSH_PUBLIC_URL 后启动日志会打印同步码，或运行 nsh-sync-server code &lt;地址&gt; &lt;令牌&gt;</div>
-            <a href="javascript:void(0)" class="nsh-link nsh-mode-switch" @click="manual = true">手动填写地址和令牌</a>
-          </div>
-        </div>
         <div v-for="f in useCode ? [] : provider.fields" :key="f.key" class="nsh-field">
           <label class="nsh-label">{{ f.label }}<em v-if="f.required">*</em></label>
           <div class="nsh-control">
@@ -150,10 +155,6 @@ function disable(): void {
             </div>
             <div v-if="f.help" class="nsh-help">{{ f.help }}</div>
           </div>
-        </div>
-        <div v-if="provider.id === 'selfhost' && manual" class="nsh-field">
-          <span class="nsh-label" />
-          <a href="javascript:void(0)" class="nsh-link" @click="manual = false">改用同步码</a>
         </div>
         <div v-if="provider.homepage" class="nsh-field">
           <span class="nsh-label" />
@@ -240,6 +241,14 @@ function disable(): void {
   display: inline-block;
   margin-top: 6px;
   font-size: 12px;
+}
+.nsh-mode-back {
+  display: inline-block;
+  margin-bottom: 10px;
+  font-size: 13px;
+}
+.nsh-code-field {
+  margin-bottom: 16px;
 }
 .nsh-sync-providers {
   margin-bottom: 16px;

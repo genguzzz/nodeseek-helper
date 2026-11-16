@@ -14,6 +14,9 @@ const MATCHES = ['https://www.nodeseek.com/*', 'https://nodeseek.com/*', 'https:
 // 构建：npm run build 产出 dist/ 下的油猴脚本与各代理工具模块
 
 export default defineConfig({
+  define: { __NSH_VERSION__: JSON.stringify(pkg.version) },
+  // 压缩脚本本体，缩短下载与解析时间（UserScript 头部由插件单独保留）
+  build: { minify: 'esbuild' },
   plugins: [
     // 稳定开发加载器：/nsh-dev.user.js 只需安装一次，见 dev/dev-loader.ts
     nshDevLoader(MATCHES),

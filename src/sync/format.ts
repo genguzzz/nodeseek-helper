@@ -45,6 +45,7 @@ export const SYNCED_SETTING_KEYS = [
   'collectFromPost',
   'freezeAnimated',
   'hoverPreview',
+  'pickerDefaultTab',
   'showUploadButton',
   'showStickerButton',
   'showFastNav',

@@ -11,6 +11,8 @@ import PickerPopover from './components/PickerPopover.vue';
 import ConfirmDialog from './components/ConfirmDialog.vue';
 import { HANABI_ICON } from './core/packs';
 
+const VERSION: string = __NSH_VERSION__;
+
 const tabs: { id: PanelTab; label: string; icon: string }[] = [
   { id: 'hosts', label: '图床', icon: '☁' },
   { id: 'stickers', label: '表情包', icon: '☺' },
@@ -54,7 +56,7 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKey));
     <div v-if="ui.panelOpen" class="nsh-mask" @mousedown.self="ui.panelOpen = false" @wheel="blockScroll" @touchmove="blockScroll">
       <div class="nsh-panel" role="dialog" aria-label="NodeSeek 助手">
         <header class="nsh-panel-head">
-          <div class="nsh-brand"><span class="nsh-brand-logo" v-html="HANABI_ICON" />NodeSeek 助手</div>
+          <div class="nsh-brand"><span class="nsh-brand-logo" v-html="HANABI_ICON" />NodeSeek 助手<span class="nsh-brand-ver">v{{ VERSION }}</span></div>
           <nav class="nsh-tabs">
             <button v-for="t in tabs" :key="t.id" class="nsh-tab" :class="{ active: ui.panelTab === t.id }" @click="ui.panelTab = t.id">
               <span class="nsh-tab-icon">{{ t.icon }}</span>{{ t.label }}
@@ -134,6 +136,12 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKey));
   font-size: 15px;
   white-space: nowrap;
 }
+.nsh-brand-ver {
+  margin-left: -2px;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--nsh-text-faint);
+}
 .nsh-brand-logo {
   display: inline-flex;
   font-size: 22px;
@@ -200,8 +208,24 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKey));
   color: var(--nsh-text);
 }
 .nsh-panel-body {
-  flex: 1;
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
   min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+/* 各页面撑满面板主体：用 flex 而不是 height:100%（iOS Safari 对 flex 子项的百分比高度解析不可靠，会导致内部无法滚动） */
+.nsh-panel-body > * {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+}
+/* 横向滚动的分组列表等宽内容不能撑宽面板（手机上会把整块面板挤出屏幕并横向错位） */
+.nsh-sm > *,
+.nsh-hosts > * {
+  min-width: 0;
 }
 .nsh-fade-enter-active,
 .nsh-fade-leave-active {
