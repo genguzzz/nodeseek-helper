@@ -81,6 +81,8 @@ interface Device {
 
 /** 新设备：清空本地存储后加载一份独立的模块实例 */
 async function newDevice(passphrase: string, opts: { keepStorage?: boolean } = {}): Promise<Device> {
+  // 先等上一台设备的防抖落盘写完，否则清空之后它才写入，新设备会读到上一台的 ETag / meta
+  await flushStorage();
   if (!opts.keepStorage) localStorage.clear();
   vi.resetModules();
   const store = await import('../src/core/store');
@@ -105,7 +107,8 @@ const addSticker = (d: Device, id: string): void => {
 };
 const ids = (d: Device): string[] => d.store.stickerData.stickers.map((s) => s.id).filter((id) => /^t_/.test(id));
 
-afterEach(() => {
+afterEach(async () => {
+  await flushStorage();
   resetRemote();
   localStorage.clear();
 });
