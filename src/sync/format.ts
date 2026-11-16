@@ -226,6 +226,41 @@ function ordered<T extends { id: string }>(items: T[], order: string[] | undefin
   return [...inOrder, ...rest];
 }
 
+/**
+ * 同一图片链接只保留一条（旧版本内置包使用随机 ID，多设备会各写一份）：
+ * 优先保留内置确定性 ID（bi_ 前缀），其次保留创建更早的；收藏取或、使用次数与最近使用取最大。
+ * 被合并掉的条目在下次生成文档时成为墓碑，其他设备随之删除。
+ */
+export function dedupeByUrl(list: Sticker[]): Sticker[] {
+  const keep = new Map<string, Sticker>();
+  const rank = (s: Sticker): number => (s.id.startsWith('bi_') ? 0 : 1);
+  for (const s of list) {
+    const cur = keep.get(s.url);
+    if (!cur) {
+      keep.set(s.url, s);
+      continue;
+    }
+    const [win, lose] = rank(s) < rank(cur) || (rank(s) === rank(cur) && s.createdAt < cur.createdAt) ? [s, cur] : [cur, s];
+    keep.set(s.url, {
+      ...win,
+      favorite: win.favorite || lose.favorite,
+      useCount: Math.max(win.useCount, lose.useCount),
+      lastUsedAt: Math.max(win.lastUsedAt, lose.lastUsedAt),
+    });
+  }
+  const winners = new Set([...keep.values()].map((s) => s.id));
+  // 保持原有顺序：按首次出现的位置输出胜出者
+  const seen = new Set<string>();
+  const out: Sticker[] = [];
+  for (const s of list) {
+    const w = keep.get(s.url) as Sticker;
+    if (seen.has(s.url) || !winners.has(w.id)) continue;
+    seen.add(s.url);
+    out.push(w);
+  }
+  return out;
+}
+
 /** 把合并后的文档写回本地存储，并把 meta 对齐到文档（避免被当成本地变更） */
 export function applyDoc(doc: SyncDocument, meta: SyncMeta): void {
   if (doc.settings.v) {
@@ -255,7 +290,7 @@ export function applyDoc(doc: SyncDocument, meta: SyncMeta): void {
       return groupIds.has(s.groupId) ? s : { ...s, groupId: 'default' };
     });
   stickerData.groups = ordered(groups, doc.order.groups.v, () => 0);
-  stickerData.stickers = ordered(stickers, doc.order.stickers.v, (s) => s.createdAt);
+  stickerData.stickers = dedupeByUrl(ordered(stickers, doc.order.stickers.v, (s) => s.createdAt));
   if (!settings.hosts.some((h) => h.id === settings.activeHostId)) settings.activeHostId = settings.hosts[0]?.id ?? '';
   // 对齐 meta：以写回后的本地内容为准，时间取文档里的时间
   const fresh: SyncMeta = {};

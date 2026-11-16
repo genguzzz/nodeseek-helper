@@ -152,3 +152,33 @@ describe('信封', () => {
     await expect(open(env, '')).rejects.toBeInstanceOf(PassphraseError);
   });
 });
+
+describe('重复表情去重', () => {
+  it('同一链接保留内置确定性 ID，合并收藏与使用次数', async () => {
+    const { dedupeByUrl } = await import('../src/sync/format');
+    const out = dedupeByUrl([
+      sticker('rand1', { url: 'https://cdn.nodeimage.com/i/x.gif', favorite: true, useCount: 5, createdAt: 100 }),
+      sticker('bi_hanabi_abc', { url: 'https://cdn.nodeimage.com/i/x.gif', useCount: 2, createdAt: 1 }),
+      sticker('other', { url: 'https://cdn.nodeimage.com/i/y.gif' }),
+    ]);
+    expect(out.map((s) => s.id)).toEqual(['bi_hanabi_abc', 'other']);
+    expect(out[0]).toMatchObject({ favorite: true, useCount: 5 });
+  });
+
+  it('两台设备各自写入内置包后合并不产生重复', async () => {
+    const { seedBuiltinPacks, settings: st } = await import('../src/core/store');
+    resetLocal([]);
+    st.seededPacks = [];
+    seedBuiltinPacks();
+    const meta1: SyncMeta = {};
+    const docA = buildLocalDoc(meta1, 'A', 1000);
+    resetLocal([]);
+    st.seededPacks = [];
+    seedBuiltinPacks();
+    const meta2: SyncMeta = {};
+    const docB = buildLocalDoc(meta2, 'B', 2000);
+    const merged = mergeDocs(docA, docB);
+    const alive = Object.values(merged.stickers).filter((e) => !e.d);
+    expect(alive.length).toBe(stickerData.stickers.length);
+  });
+});

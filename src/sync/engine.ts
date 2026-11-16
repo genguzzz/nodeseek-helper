@@ -2,7 +2,7 @@ import { reactive, toRaw, watch } from 'vue';
 import { GM_getValue, GM_setValue } from '$';
 import { isApplyingRemote, settings, stickerData, uid } from '../core/store';
 import { open, PassphraseError, seal } from './crypto';
-import { applyDoc, buildLocalDoc, docHash, mergeDocs, type SyncMeta } from './format';
+import { applyDoc, buildLocalDoc, dedupeByUrl, docHash, mergeDocs, type SyncMeta } from './format';
 import { ConflictError, syncProviderById, type Values } from './providers';
 
 /** 本机同步配置：不参与同步（含后端凭据与加密口令） */
@@ -74,6 +74,12 @@ export async function syncNow(reason = 'manual'): Promise<void> {
   try {
     for (let attempt = 0; attempt < MAX_RETRY; attempt++) {
       const pulled = await p.pull(v, syncConfig.lastEtag || undefined);
+      // 本地先去重（同一链接多条）：被去掉的条目会在下面生成墓碑并推送，其他设备随之清理
+      const deduped = dedupeByUrl(stickerData.stickers);
+      if (deduped.length !== stickerData.stickers.length) {
+        stickerData.stickers = deduped;
+        syncState.dirty = true;
+      }
       const local = buildLocalDoc(syncConfig.meta, syncConfig.deviceId);
       let next = local;
       let remoteHash = '';

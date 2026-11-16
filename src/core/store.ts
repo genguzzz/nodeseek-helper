@@ -130,7 +130,11 @@ export function seedBuiltinPacks(force = false): void {
     if (!stickerData.groups.some((g) => g.id === pack.id)) {
       stickerData.groups.splice(1, 0, { id: pack.id, name: pack.name, icon: pack.icon, builtin: pack.id });
     }
-    addStickers(pack.urls.map((url, i) => ({ url, name: `${pack.name}${String(i + 1).padStart(2, '0')}` })), pack.id);
+    // 确定性 ID 与创建时间：多台设备各自写入内置包后内容完全一致，同步时不会出现重复
+    addStickers(
+      pack.urls.map((url, i) => ({ url, name: `${pack.name}${String(i + 1).padStart(2, '0')}`, id: `bi_${pack.id}_${stableHash(url)}`, createdAt: i + 1 })),
+      pack.id,
+    );
     if (!settings.seededPacks.includes(pack.id)) settings.seededPacks.push(pack.id);
   }
 }
@@ -189,7 +193,25 @@ export interface ImportResult {
   skipped: number;
 }
 
-export function addStickers(items: { url: string; name?: string }[], groupId: string): ImportResult {
+/** 字符串摘要（FNV-1a），用于生成跨设备一致的 ID */
+export function stableHash(str: string): string {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return (h >>> 0).toString(36);
+}
+
+export interface StickerInput {
+  url: string;
+  name?: string;
+  /** 指定 ID（内置包使用确定性 ID，各设备生成的条目一致，同步时自然合并） */
+  id?: string;
+  createdAt?: number;
+}
+
+export function addStickers(items: StickerInput[], groupId: string): ImportResult {
   const exists = new Set(stickerData.stickers.map((s) => s.url));
   let added = 0;
   let skipped = 0;
@@ -202,14 +224,14 @@ export function addStickers(items: { url: string; name?: string }[], groupId: st
     }
     exists.add(url);
     stickerData.stickers.push({
-      id: uid(),
+      id: it.id ?? uid(),
       url,
       name: (it.name || guessName(url)).slice(0, 40),
       groupId,
       favorite: false,
       useCount: 0,
       lastUsedAt: 0,
-      createdAt: now + added,
+      createdAt: it.createdAt ?? now + added,
     });
     added++;
   }
