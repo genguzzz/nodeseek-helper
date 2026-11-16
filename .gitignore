@@ -5,3 +5,4 @@ presets/
 server/data/
 server/bin/
 *.log
+docs/media/raw/
