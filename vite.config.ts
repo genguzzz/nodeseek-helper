@@ -2,6 +2,7 @@ import { defineConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
 import monkey, { cdn } from 'vite-plugin-monkey';
 import fs from 'node:fs';
+import { nshDevLoader } from './dev/dev-loader';
 
 const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8')) as { version: string };
 /** 发布地址（dist 的公开 URL），设置后写入 @updateURL / @downloadURL，油猴可自动更新 */
@@ -33,8 +34,16 @@ function presetConnectHosts(): string[] {
 
 // 开发：npm run dev 后在浏览器打开终端提示的 *.user.js 安装一次，之后改代码页面自动热更新
 // 构建：npm run build 产出 dist/nodeseek-helper.user.js
+// 开发加载器的头部必须保持不变：油猴按 name + namespace 识别脚本，头部一变就得重新安装、改错还会多装一份。
+// 开发时代码由加载器从本地 dev server 动态拉取（保存即热更新），无需重新安装；
+// 个人图床域名等动态 @connect 只写进正式构建，不进开发加载器。
+const MATCHES = ['https://www.nodeseek.com/*', 'https://nodeseek.com/*', 'https://www.deepflood.com/*', 'https://deepflood.com/*'];
+const isServe = process.argv.includes('serve') || !process.argv.includes('build');
+
 export default defineConfig({
   plugins: [
+    // 稳定开发加载器：/nsh-dev.user.js 只需安装一次，见 dev/dev-loader.ts
+    nshDevLoader(MATCHES),
     vue(),
     monkey({
       entry: 'src/main.ts',
@@ -53,8 +62,8 @@ export default defineConfig({
         license: 'MIT',
         description: 'NodeSeek 粘贴/拖拽图片自动上传图床（CloudFlare-ImgBed、兰空、EasyImage、Chevereto、SM.MS、Imgur、PicList、NodeImage、自定义），以及自定义表情包管理与快捷发送',
         icon: 'https://www.nodeseek.com/static/image/favicon/android-chrome-192x192.png',
-        match: ['https://www.nodeseek.com/*', 'https://nodeseek.com/*', 'https://www.deepflood.com/*', 'https://deepflood.com/*'],
-        connect: [...presetConnectHosts(), '*'],
+        match: MATCHES,
+        connect: isServe ? ['*'] : [...presetConnectHosts(), '*'],
         'run-at': 'document-start',
         grant: [
           'GM_xmlhttpRequest',
