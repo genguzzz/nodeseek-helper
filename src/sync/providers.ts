@@ -45,6 +45,9 @@ function http(
 
 const trimBase = (u: string | undefined): string => (u ?? '').trim().replace(/\/+$/, '');
 
+/** 经过 CDN（如 Cloudflare 重新压缩）时 ETag 会被改成弱 ETag W/"…"，统一去掉前缀，条件请求才能对上 */
+const strongEtag = (e: string | undefined): string | undefined => e?.replace(/^W\//, '');
+
 export class ConflictError extends Error {
   constructor() {
     super('远端在此期间被其他设备修改');
@@ -103,12 +106,13 @@ const selfhost: SyncProvider = {
     { key: 'token', label: '访问令牌', type: 'password', required: true, help: '服务端发给你的令牌；每个令牌是独立的空间' },
   ],
   async pull(v, etag) {
+    etag = strongEtag(etag);
     const r = await http('GET', `${trimBase(v.base)}/v1/sync`, { Authorization: `Bearer ${v.token}`, ...(etag ? { 'If-None-Match': etag } : {}) });
     const locked = r.headers['x-nsh-locked'] === '1';
-    if (r.status === 304) return { status: 'notModified', etag, locked };
+    if (r.status === 304) return { status: 'notModified', etag: strongEtag(etag), locked };
     if (r.status === 404) return { status: 'empty', locked };
     if (r.status !== 200) fail(r, '拉取失败');
-    return { status: 'ok', etag: r.headers.etag, envelope: parseEnvelope(r.text), locked };
+    return { status: 'ok', etag: strongEtag(r.headers.etag), envelope: parseEnvelope(r.text), locked };
   },
   keyScope: (v) => v.token ?? '',
   async push(v, env, etag, keyId) {
@@ -123,11 +127,12 @@ const selfhost: SyncProvider = {
       throw new LockedError('这个同步空间已被另一个加密口令锁定：请填写最初设置的口令，或在已同步的设备上复制「接入码」粘贴到这里。忘记口令只能请服务端管理员解锁');
     }
     if (r.status !== 200) fail(r, '推送失败');
-    return r.headers.etag || (JSON.parse(r.text) as { etag: string }).etag;
+    // 优先用响应体里的 ETag：响应头可能被 CDN 改写
+    return (JSON.parse(r.text) as { etag?: string }).etag || strongEtag(r.headers.etag) || '';
   },
   async watch(v, etag, signal) {
     if (signal.aborted) return false;
-    const r = await http('GET', `${trimBase(v.base)}/v1/sync/watch?etag=${encodeURIComponent(etag)}&timeout=25`, { Authorization: `Bearer ${v.token}` }, undefined, 35_000, signal);
+    const r = await http('GET', `${trimBase(v.base)}/v1/sync/watch?etag=${encodeURIComponent(strongEtag(etag) ?? '')}&timeout=25`, { Authorization: `Bearer ${v.token}` }, undefined, 35_000, signal);
     if (r.status === 200) return true;
     if (r.status === 304) return false;
     // 限流 / 认证失败 / 服务异常：抛出让调用方退避，不能当作「无变化」立刻重连

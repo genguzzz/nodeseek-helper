@@ -143,7 +143,8 @@ func (s *Server) get(w http.ResponseWriter, r *http.Request, sid string) {
 	h := w.Header()
 	h.Set("ETag", m.etag)
 	h.Set(headerUpdated, strconv.FormatInt(m.updatedAt, 10))
-	h.Set("Cache-Control", "no-store")
+	// no-transform：不让 CDN（如 Cloudflare）重新压缩响应，否则它会把强 ETag 改成弱 ETag（W/"…"）
+	h.Set("Cache-Control", "no-store, no-transform")
 	h.Set("Content-Type", contentTypeJSON)
 	if s.store.Lock(sid) != "" {
 		h.Set(headerLocked, "1")
@@ -161,7 +162,8 @@ func (s *Server) put(w http.ResponseWriter, r *http.Request, sid string) {
 		writeJSON(w, http.StatusRequestEntityTooLarge, map[string]string{"message": "数据过大"})
 		return
 	}
-	ifMatch := strings.TrimSpace(r.Header.Get("If-Match"))
+	// 经过 CDN 时客户端拿到的可能是弱 ETag（W/"…"），去掉前缀再比较
+	ifMatch := strings.TrimPrefix(strings.TrimSpace(r.Header.Get("If-Match")), "W/")
 	ifNone := strings.TrimSpace(r.Header.Get("If-None-Match")) == "*"
 	m, err := s.store.Put(sid, r.Body, s.cfg.MaxBody, ifMatch, ifNone, keyIDOf(r))
 	switch {
@@ -218,7 +220,7 @@ func (s *Server) watch(w http.ResponseWriter, r *http.Request, sid string) {
 	}
 	// 单独放宽本请求的写超时，不影响其他请求
 	_ = http.NewResponseController(w).SetWriteDeadline(time.Now().Add(time.Duration(timeout+10) * time.Second))
-	since := r.URL.Query().Get("etag")
+	since := strings.TrimPrefix(r.URL.Query().Get("etag"), "W/")
 	ch := s.store.Changed(sid)
 	if m, _ := s.store.Meta(sid); m.etag != since {
 		writeJSON(w, http.StatusOK, map[string]any{"etag": m.etag, "updatedAt": m.updatedAt})

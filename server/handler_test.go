@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -214,5 +215,28 @@ func TestOpenMode(t *testing.T) {
 	r.Body.Close()
 	if r.StatusCode != 404 {
 		t.Fatalf("开放模式下合法令牌应可访问，实际 %d", r.StatusCode)
+	}
+}
+
+// 经过 Cloudflare 等 CDN 时客户端拿到的是弱 ETag（W/"…"），条件写入与长轮询都要认
+func TestWeakETagFromCDN(t *testing.T) {
+	ts, _ := newTestServer(t, "")
+	res := do(t, "PUT", ts.URL+"/v1/sync", `{"a":1}`, map[string]string{"If-None-Match": "*"})
+	etag := res.Header.Get("ETag")
+	if res.StatusCode != 200 || etag == "" {
+		t.Fatalf("首次写入失败 %d", res.StatusCode)
+	}
+	g := do(t, "GET", ts.URL+"/v1/sync", "", nil)
+	if !strings.Contains(g.Header.Get("Cache-Control"), "no-transform") {
+		t.Fatalf("GET 应带 no-transform，避免 CDN 改写 ETag：%q", g.Header.Get("Cache-Control"))
+	}
+	if r := do(t, "GET", ts.URL+"/v1/sync", "", map[string]string{"If-None-Match": "W/" + etag}); r.StatusCode != 304 {
+		t.Fatalf("弱 ETag 的 If-None-Match 应为 304，得到 %d", r.StatusCode)
+	}
+	if r := do(t, "GET", ts.URL+"/v1/sync/watch?timeout=1&etag="+url.QueryEscape("W/"+etag), "", nil); r.StatusCode != 304 {
+		t.Fatalf("弱 ETag 的长轮询应等待到超时（304），得到 %d", r.StatusCode)
+	}
+	if r := do(t, "PUT", ts.URL+"/v1/sync", `{"a":2}`, map[string]string{"If-Match": "W/" + etag}); r.StatusCode != 200 {
+		t.Fatalf("弱 ETag 的 If-Match 应能写入，得到 %d", r.StatusCode)
 	}
 }
