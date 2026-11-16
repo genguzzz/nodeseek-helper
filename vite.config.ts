@@ -3,42 +3,15 @@ import vue from '@vitejs/plugin-vue';
 import monkey, { cdn } from 'vite-plugin-monkey';
 import fs from 'node:fs';
 import { nshDevLoader } from './dev/dev-loader';
+import { presetConnectHosts } from './dev/presets';
 
 const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8')) as { version: string };
 /** 发布地址（dist 的公开 URL），设置后写入 @updateURL / @downloadURL，油猴可自动更新 */
 const publishBase = process.env.NSH_PUBLISH_BASE?.replace(/\/+$/, '');
-
-/**
- * 本地 presets/*.json（已 gitignore）里配置的图床域名，显式写进 @connect：
- * Tampermonkey 对声明过的域名直接放行，不再弹跨域确认；个人域名不进入公共代码。
- */
-function presetConnectHosts(): string[] {
-  const dir = 'presets';
-  if (!fs.existsSync(dir)) return [];
-  const hosts = new Set<string>();
-  for (const f of fs.readdirSync(dir).filter((x) => x.endsWith('.json'))) {
-    try {
-      const json = JSON.parse(fs.readFileSync(`${dir}/${f}`, 'utf8'));
-      const list = [...(json.hosts ?? json.settings?.hosts ?? []), ...(json.sync ? [{ values: json.sync }] : [])];
-      for (const h of list) {
-        for (const v of Object.values(h.values ?? {})) {
-          if (typeof v === 'string' && /^https?:\/\//.test(v)) hosts.add(new URL(v).hostname);
-        }
-      }
-    } catch {
-      /* 忽略无效文件 */
-    }
-  }
-  return [...hosts];
-}
-
-// 开发：npm run dev 后在浏览器打开终端提示的 *.user.js 安装一次，之后改代码页面自动热更新
-// 构建：npm run build 产出 dist/nodeseek-helper.user.js
-// 开发加载器的头部必须保持不变：油猴按 name + namespace 识别脚本，头部一变就得重新安装、改错还会多装一份。
-// 开发时代码由加载器从本地 dev server 动态拉取（保存即热更新），无需重新安装；
-// 个人图床域名等动态 @connect 只写进正式构建，不进开发加载器。
 const MATCHES = ['https://www.nodeseek.com/*', 'https://nodeseek.com/*', 'https://www.deepflood.com/*', 'https://deepflood.com/*'];
-const isServe = process.argv.includes('serve') || !process.argv.includes('build');
+
+// 开发：npm run dev，首次 npm run dev:install 安装开发加载器，之后保存即热更新（见 docs/dev.md）
+// 构建：npm run build 产出 dist/ 下的油猴脚本与各代理工具模块
 
 export default defineConfig({
   plugins: [
@@ -63,7 +36,7 @@ export default defineConfig({
         description: 'NodeSeek 粘贴/拖拽图片自动上传图床（CloudFlare-ImgBed、兰空、EasyImage、Chevereto、SM.MS、Imgur、PicList、NodeImage、自定义），以及自定义表情包管理与快捷发送',
         icon: 'https://www.nodeseek.com/static/image/favicon/android-chrome-192x192.png',
         match: MATCHES,
-        connect: isServe ? ['*'] : [...presetConnectHosts(), '*'],
+        connect: [...presetConnectHosts(), '*'],
         'run-at': 'document-start',
         grant: [
           'GM_xmlhttpRequest',

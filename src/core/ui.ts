@@ -41,7 +41,6 @@ export const ui = reactive({
   picker: null as PickerState | null,
   panelOpen: false,
   panelTab: 'hosts' as PanelTab,
-  dark: false,
   toasts: [] as Toast[],
   preview: null as PreviewState | null,
 });

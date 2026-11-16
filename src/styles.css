@@ -187,35 +187,6 @@
 .nsh-switch:focus-visible {
   box-shadow: 0 0 0 3px var(--nsh-accent-soft);
 }
-.nsh-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  height: 26px;
-  padding: 0 10px;
-  border-radius: 4px;
-  font-size: 12px;
-  color: var(--nsh-text-sub);
-  background: transparent;
-  border: 1px solid transparent;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: background 0.15s, color 0.15s;
-}
-.nsh-chip:hover {
-  background: var(--nsh-bg-muted);
-  color: var(--nsh-text);
-}
-.nsh-chip.active {
-  background: var(--nsh-accent-soft);
-  color: var(--nsh-accent);
-  font-weight: 600;
-}
-.nsh-chip .nsh-count {
-  font-size: 11px;
-  opacity: 0.7;
-  font-weight: 400;
-}
 .nsh-icon {
   display: inline-flex;
   width: 1.1em;

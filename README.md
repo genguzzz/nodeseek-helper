@@ -151,14 +151,15 @@ NSH_TOKENS=换成一个足够长的随机令牌 NSH_DATA=./data ./nsh-sync-serve
 
 ```bash
 npm install
-npm run dev          # 浏览器打开 http://127.0.0.1:5173/__vite-plugin-monkey.install.user.js 安装一次，之后保存即热更新
+npm run dev          # 启动本地 dev server（热更新）
+npm run dev:install  # 自动把开发加载器安装进 Arc 的 Tampermonkey（只需一次，之后保存即生效）
 npm run build        # 产出 dist/：油猴脚本 + 代理注入版 + 各代理工具模块
 npm test             # 同步合并 / 加密单测
 npm run typecheck
 ```
 
 - 基于 [vite-plugin-monkey](https://github.com/lisonge/vite-plugin-monkey) + Vue 3 + TypeScript。
-- 开发模式下，油猴里安装的只是加载器，代码从本地开发服务器动态加载，修改后页面自动刷新，无需重新安装。
+- 开发模式下，油猴里安装的只是加载器（`/nsh-dev.user.js`），代码从本地 dev server 动态加载并热更新；dev server 重启、配置变化都无需重装。详见 [docs/dev.md](docs/dev.md)。
 - 代理版构建（`vite.inject.config.ts`）把 `$`（GM API）替换为 `src/platform/web.ts`：存储用 localStorage，跨域请求经同源 `/__nsh/relay` 交给代理脚本转发。
 - 本地无登录态调试：`node dev/mock-server.mjs` 后打开
   - `http://localhost:5299/dev/mock.html`：模拟编辑器 + 模拟 ImgBed（认证码 `test-code`）

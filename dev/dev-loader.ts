@@ -1,5 +1,5 @@
-import fs from 'node:fs';
 import type { Plugin } from 'vite';
+import { presetConnectHosts } from './presets';
 
 /**
  * 稳定的开发加载器（只需安装一次）
@@ -47,33 +47,14 @@ const GRANTS = [
   'window.onurlchange',
 ];
 
-/** 本地 presets/*.json 中的域名：写进加载器 @connect，Tampermonkey 不再逐个弹跨域确认 */
-function presetHosts(): string[] {
-  const dir = 'presets';
-  if (!fs.existsSync(dir)) return [];
-  const hosts = new Set<string>();
-  for (const f of fs.readdirSync(dir).filter((x) => x.endsWith('.json'))) {
-    try {
-      const json = JSON.parse(fs.readFileSync(`${dir}/${f}`, 'utf8'));
-      const list = [...(json.hosts ?? json.settings?.hosts ?? []), ...(json.sync ? [{ values: json.sync }] : [])];
-      for (const h of list) {
-        for (const v of Object.values(h.values ?? {})) if (typeof v === 'string' && /^https?:\/\//.test(v)) hosts.add(new URL(v).hostname);
-      }
-    } catch {
-      /* 忽略无效文件 */
-    }
-  }
-  return [...hosts].sort();
-}
-
-function loaderSource(origin: string, matches: string[]): string {
+export function loaderSource(origin: string, matches: string[]): string {
   const meta = [
     ['name', 'NodeSeek 助手 · 开发'],
     ['namespace', 'https://github.com/genguzzz/nodeseek-helper/dev'],
     ['version', '1.0.0'],
     ['description', '开发加载器：从本地 dev server 动态加载代码并热更新，只需安装一次'],
     ...matches.map((m) => ['match', m]),
-    ...presetHosts().map((h) => ['connect', h]),
+    ...presetConnectHosts().map((h) => ['connect', h]),
     ['connect', 'localhost'],
     ['connect', '127.0.0.1'],
     ['connect', '*'],
@@ -98,6 +79,7 @@ function loaderSource(origin: string, matches: string[]): string {
   const s = document.createElement('script');
   s.type = 'module';
   s.src = window.trustedTypes ? window.trustedTypes.createPolicy(key, { createScriptURL: (u) => u }).createScriptURL(entry) : entry;
+  s.onerror = () => console.warn('[NodeSeek 助手 · 开发] 无法连接本地 dev server：' + entry + '（请在项目目录运行 npm run dev）');
   (document.head || document.documentElement).append(s);
 })(${JSON.stringify(`${origin}/__vite-plugin-monkey.entry.js`)}, ${JSON.stringify(DEV_KEY)});
 `;
@@ -110,6 +92,15 @@ export function nshDevLoader(matches: string[]): Plugin {
     apply: 'serve',
     enforce: 'pre',
     configureServer(server) {
+      server.httpServer?.once('listening', () => {
+        const addr = server.httpServer?.address();
+        const port = typeof addr === 'object' && addr ? addr.port : 5173;
+        setTimeout(() => {
+          server.config.logger.info(
+            `\n  油猴开发加载器（只需安装一次）：http://127.0.0.1:${port}${DEV_LOADER_PATH}\n  自动安装到 Arc 的 Tampermonkey：npm run dev:install\n`,
+          );
+        }, 50);
+      });
       server.middlewares.use(DEV_LOADER_PATH, (req, res) => {
         const host = req.headers.host ?? '127.0.0.1:5173';
         res.setHeader('Content-Type', 'application/javascript; charset=utf-8');

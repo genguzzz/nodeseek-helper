@@ -269,9 +269,8 @@ function runApp(key: string): void {
   gap: 2px;
   overflow-x: auto;
   overflow-y: hidden;
-  scrollbar-width: thin;
-  scrollbar-color: var(--nsh-border) transparent;
-  padding-bottom: 2px;
+  /* 底部横向滚动条（6px）+ 间距（2px）只占下方空间，上方补同样的 8px，文字与右侧搜索 / 管理保持同一中线 */
+  padding: 8px 0 2px;
   --fade-l: 0px;
   --fade-r: 0px;
   -webkit-mask-image: linear-gradient(to right, transparent 0, #000 var(--fade-l), #000 calc(100% - var(--fade-r)), transparent 100%);
@@ -284,14 +283,25 @@ function runApp(key: string): void {
   --fade-r: 28px;
 }
 .nsh-picker-tabs::-webkit-scrollbar {
-  height: 3px;
+  height: 6px;
+}
+.nsh-picker-tabs::-webkit-scrollbar-track {
+  background: transparent;
+}
+/* 新版 Chromium 中标准属性 scrollbar-width 会覆盖 ::-webkit-scrollbar，只给不支持该伪元素的 Firefox 用 */
+@supports not selector(::-webkit-scrollbar) {
+  .nsh-picker-tabs {
+    scrollbar-width: thin;
+    scrollbar-color: var(--nsh-border) transparent;
+  }
 }
 .nsh-picker-tabs::-webkit-scrollbar-thumb {
-  background: var(--nsh-border);
-  border-radius: 2px;
-}
-.nsh-picker-tabs:hover::-webkit-scrollbar-thumb {
   background: var(--nsh-text-faint);
+  border-radius: 3px;
+}
+.nsh-picker-tabs::-webkit-scrollbar-thumb:hover,
+.nsh-picker-tabs::-webkit-scrollbar-thumb:active {
+  background: var(--nsh-text-sub);
 }
 .nsh-picker-sep {
   width: 1px;

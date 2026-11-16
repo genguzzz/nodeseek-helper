@@ -103,6 +103,10 @@ cmd_uninstall() {
 
 cmd_install() {
   local url=$1 id; id=$(tm_id)
+  if ! curl -sf -o /dev/null -m 5 "$url"; then
+    echo "无法访问 $url（开发加载器需要先运行 npm run dev）" >&2
+    exit 1
+  fi
   close_tabs "$id/ask.html"
   open_tab "$url"
   wait_for "$id/ask.html" "[...document.querySelectorAll('input[type=button],button')].some(b => /^(Install|Reinstall|Update|安装|重新安装|更新)\$/.test((b.value || b.innerText).trim()))" \

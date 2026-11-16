@@ -30,7 +30,6 @@ function injectHeaderEntry(): boolean {
   btn.innerHTML = HANABI_ICON_MONO;
   btn.addEventListener('click', () => openPanel());
   anchor.before(btn);
-  document.documentElement.dataset.nshHeaderAt = String(Math.round(performance.now()));
   return true;
 }
 

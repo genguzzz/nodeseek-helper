@@ -9,7 +9,10 @@
     "build:userscript": "vite build",
     "build:proxy": "vite build -c vite.inject.config.ts && node scripts/build-proxy.mjs",
     "typecheck": "vue-tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "dev:install": "bash scripts/tm.sh dev",
+    "tm:list": "bash scripts/tm.sh list",
+    "tm:uninstall": "bash scripts/tm.sh uninstall"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^6.0.11",

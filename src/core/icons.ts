@@ -10,10 +10,6 @@ export const ICON_GEAR = svg(
   '<path d="M18.3 6.6 20 3h8l1.7 3.6 3.9 2.2 4-.4 4 6.9-2.3 3.3v4.6l2.3 3.3-4 6.9-4-.4-3.9 2.2L28 45h-8l-1.7-3.6-3.9-2.2-4 .4-4-6.9 2.3-3.3v-4.6L6.4 15.5l4-6.9 4 .4 3.9-2.4Z"/><circle cx="24" cy="24" r="6"/>',
   '16',
 );
-export const ICON_STICKER = svg(
-  '<path d="M24 44c11 0 20-9 20-20S35 4 24 4 4 13 4 24s9 20 20 20Z"/><path d="M31 18v1M17 18v1M31 31s-2 4-7 4-7-4-7-4"/>',
-  '15',
-);
 
 /** 工具栏表情按钮：与 IconPark outline 同笔画 */
 export const ICON_EMOJI = svg(
