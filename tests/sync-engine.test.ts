@@ -53,9 +53,10 @@ function makeFake(errors: { ConflictError: new () => Error; LockedError: new (ms
       const gate = remote.gate;
       remote.gate = undefined;
       if (gate) await gate;
-      if (!remote.body) return { status: 'empty' };
-      if (etag && etag === remote.etag) return { status: 'notModified', etag };
-      return { status: 'ok', etag: remote.etag, envelope: JSON.parse(remote.body) as Envelope };
+      const locked = !!remote.lock;
+      if (!remote.body) return { status: 'empty', locked };
+      if (etag && etag === remote.etag) return { status: 'notModified', etag, locked };
+      return { status: 'ok', etag: remote.etag, envelope: JSON.parse(remote.body) as Envelope, locked };
     },
     async push(_v, env, etag, keyId) {
       remote.pushes++;
@@ -321,6 +322,19 @@ describe('同步引擎：口令锁（第一个设置口令的人锁定空间）'
     await a2.engine.syncNow();
     expect(a2.engine.syncState.status).toMatch(/已同步/);
     expect(ids(a2)).toEqual(['t_owner']);
+  });
+
+  it('升级前已加密但未锁定的空间：有口令的设备同步一次即锁定（即使本地没有修改）', async () => {
+    const a = await newDevice('owner');
+    addSticker(a, 't_owner');
+    await a.engine.syncNow();
+    remote.lock = undefined; // 模拟旧版服务端写入、尚未锁定
+    const pushes = remote.pushes;
+    await a.engine.syncNow();
+    expect(remote.pushes).toBe(pushes + 1);
+    expect(remote.lock).toMatch(/^[0-9a-f]{64}$/);
+    await a.engine.syncNow();
+    expect(remote.pushes).toBe(pushes + 1); // 已锁定后不再多余推送
   });
 
   it('不加密的写入不会锁定空间', async () => {

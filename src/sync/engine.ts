@@ -139,7 +139,10 @@ export async function syncNow(reason = 'manual'): Promise<void> {
         }
       }
       const etag = pulled.status === 'notModified' ? syncConfig.lastEtag : pulled.etag;
-      const needPush = pulled.status === 'empty' || needEncrypt || (pulled.status === 'notModified' ? syncConfig.dirty : docHash(next) !== remoteHash);
+      // 设置了口令、但空间还没被锁定（如升级前创建的空间）：写入一次，用当前口令锁定
+      const needLock = !!p.keyScope && !!syncConfig.passphrase && pulled.locked === false;
+      const needPush =
+        pulled.status === 'empty' || needEncrypt || needLock || (pulled.status === 'notModified' ? syncConfig.dirty : docHash(next) !== remoteHash);
       if (!needPush) {
         syncConfig.lastEtag = etag ?? '';
         break;

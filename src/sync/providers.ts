@@ -56,6 +56,8 @@ export interface PullResult {
   status: 'ok' | 'empty' | 'notModified';
   etag?: string;
   envelope?: Envelope;
+  /** 支持口令锁的后端：空间是否已被口令锁定 */
+  locked?: boolean;
 }
 
 export type Values = Record<string, string>;
@@ -102,10 +104,11 @@ const selfhost: SyncProvider = {
   ],
   async pull(v, etag) {
     const r = await http('GET', `${trimBase(v.base)}/v1/sync`, { Authorization: `Bearer ${v.token}`, ...(etag ? { 'If-None-Match': etag } : {}) });
-    if (r.status === 304) return { status: 'notModified', etag };
-    if (r.status === 404) return { status: 'empty' };
+    const locked = r.headers['x-nsh-locked'] === '1';
+    if (r.status === 304) return { status: 'notModified', etag, locked };
+    if (r.status === 404) return { status: 'empty', locked };
     if (r.status !== 200) fail(r, '拉取失败');
-    return { status: 'ok', etag: r.headers.etag, envelope: parseEnvelope(r.text) };
+    return { status: 'ok', etag: r.headers.etag, envelope: parseEnvelope(r.text), locked };
   },
   keyScope: (v) => v.token ?? '',
   async push(v, env, etag, keyId) {
