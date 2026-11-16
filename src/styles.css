@@ -149,17 +149,22 @@
   border-color: var(--nsh-accent);
   box-shadow: 0 0 0 3px var(--nsh-accent-soft);
 }
+/* 标准胶囊开关：全圆角轨道 + 圆形滑块 */
 .nsh-switch {
   position: relative;
   width: 36px;
   height: 20px;
   flex: none;
-  border-radius: var(--nsh-radius);
-  background: var(--nsh-text-faint);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.18);
   cursor: pointer;
-  transition: background 0.2s;
+  transition: background 0.2s ease;
   border: none;
   padding: 0;
+  outline: none;
+}
+.dark-layout .nsh-switch {
+  background: rgba(255, 255, 255, 0.2);
 }
 .nsh-switch::after {
   content: '';
@@ -170,14 +175,17 @@
   height: 16px;
   border-radius: 50%;
   background: #fff;
-  transition: transform 0.2s;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .nsh-switch.on {
   background: var(--nsh-accent);
 }
 .nsh-switch.on::after {
   transform: translateX(16px);
+}
+.nsh-switch:focus-visible {
+  box-shadow: 0 0 0 3px var(--nsh-accent-soft);
 }
 .nsh-chip {
   display: inline-flex;

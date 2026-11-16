@@ -120,11 +120,12 @@ async function serveApp() {
 function injectHtml() {
   const ct = headerOf($response.headers, 'Content-Type') || '';
   const body = $response.body;
-  if (!/text\/html/i.test(ct) || typeof body !== 'string' || body.indexOf('</body>') < 0 || body.indexOf('/__nsh/app.js') >= 0) {
+  if (!/text\/html/i.test(ct) || typeof body !== 'string' || body.indexOf('</head>') < 0 || body.indexOf('/__nsh/app.js') >= 0) {
     return $done({});
   }
-  const tag = `<script src="/__nsh/app.js?v=${NSH_VERSION}" defer></script>`;
-  const i = body.lastIndexOf('</body>');
+  // 放在 <head> 里同步执行：脚本先于页面主体运行，顶部图标等能在首帧前就位
+  const tag = `<script src="/__nsh/app.js?v=${NSH_VERSION}"></script>`;
+  const i = body.indexOf('</head>');
   const headers = Object.assign({}, $response.headers);
   // 若站点日后加了 CSP，去掉以保证注入脚本可执行
   Object.keys(headers).forEach((k) => {

@@ -55,7 +55,7 @@ export default defineConfig({
         icon: 'https://www.nodeseek.com/static/image/favicon/android-chrome-192x192.png',
         match: ['https://www.nodeseek.com/*', 'https://nodeseek.com/*', 'https://www.deepflood.com/*', 'https://deepflood.com/*'],
         connect: [...presetConnectHosts(), '*'],
-        'run-at': 'document-end',
+        'run-at': 'document-start',
         grant: [
           'GM_xmlhttpRequest',
           'GM_getValue',

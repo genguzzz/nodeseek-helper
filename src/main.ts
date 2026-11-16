@@ -19,16 +19,35 @@ function mountApp(): void {
   createApp(App).mount(host);
 }
 
-/** 顶部导航栏入口，放在主题切换按钮旁边 */
-function injectHeaderEntry(): void {
+/** 顶部导航栏入口，放在主题切换按钮旁边；返回是否已就位 */
+function injectHeaderEntry(): boolean {
+  if (document.querySelector('.nsh-head-entry')) return true;
   const anchor = document.querySelector('#nsk-head .color-theme-switcher');
-  if (!anchor || document.querySelector('.nsh-head-entry')) return;
+  if (!anchor) return false;
   const btn = document.createElement('div');
   btn.className = 'nsh-head-entry';
   btn.title = 'NodeSeek 助手：图床与表情包';
   btn.innerHTML = HANABI_ICON_MONO;
   btn.addEventListener('click', () => openPanel());
   anchor.before(btn);
+  document.documentElement.dataset.nshHeaderAt = String(Math.round(performance.now()));
+  return true;
+}
+
+/**
+ * 尽早注入顶部图标：脚本在 document-start 运行，解析到主题切换按钮的那一刻同步插入，
+ * 赶在首帧绘制之前，与搜索框一起出现，不会闪一下。
+ */
+function injectHeaderEarly(): void {
+  if (injectHeaderEntry()) return;
+  const mo = new MutationObserver(() => {
+    if (injectHeaderEntry()) mo.disconnect();
+  });
+  mo.observe(document.documentElement, { childList: true, subtree: true });
+  document.addEventListener('DOMContentLoaded', () => {
+    injectHeaderEntry();
+    mo.disconnect();
+  }, { once: true });
 }
 
 /** 帖子里悬浮图片时出现「收藏为表情」 */
@@ -83,13 +102,9 @@ function bindEntryToggles(): void {
   });
 }
 
-function boot(): void {
-  // 油猴与代理注入同时启用时只运行一份（DOM 标记在两个环境间共享）
-  if (document.documentElement.dataset.nshLoaded) return;
-  document.documentElement.dataset.nshLoaded = '1';
+/** 依赖 body 的部分在 DOM 就绪后启动 */
+function bootBody(): void {
   mountApp();
-  bindEntryToggles();
-  injectHeaderEntry();
   injectFastNav();
   watchEditors();
   setupCollect();
@@ -99,6 +114,17 @@ function boot(): void {
   GM_registerMenuCommand('☁ 图床设置', () => openPanel('hosts'));
   GM_registerMenuCommand('☺ 表情包管理', () => openPanel('stickers'));
   GM_registerMenuCommand('⇅ 配置同步', () => openPanel('sync'));
+}
+
+function boot(): void {
+  // 油猴与代理注入同时启用时只运行一份（DOM 标记在两个环境间共享）
+  if (document.documentElement.dataset.nshLoaded) return;
+  document.documentElement.dataset.nshLoaded = '1';
+  // 入口开关与顶部图标在首帧前就位
+  bindEntryToggles();
+  injectHeaderEarly();
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bootBody, { once: true });
+  else bootBody();
 }
 
 boot();
