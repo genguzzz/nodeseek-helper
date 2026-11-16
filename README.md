@@ -13,6 +13,12 @@
 
 ---
 
+| 工具栏表情：分组 · 悬浮播放 · 官方转义码 | 粘贴截图自动上传图床 |
+|---|---|
+| ![表情面板](docs/media/stickers.gif) | ![粘贴上传](docs/media/paste-upload.gif) |
+
+![管理面板与日夜间](docs/media/panel-theme.gif)
+
 ## 安装
 
 到 [Releases](https://github.com/genguzzz/nodeseek-helper/releases/latest) 下载，或直接使用下面的链接（总是指向最新版本）。

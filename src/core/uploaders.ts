@@ -37,6 +37,9 @@ export interface ProviderDef {
   parse(json: unknown, v: Values): string | undefined;
 }
 
+/** 代理注入版（GM API 由 platform/web.ts 提供）里才使用上传进度回调 */
+const IS_WEB_PLATFORM = typeof (GM_xmlhttpRequest as unknown as { nshWeb?: boolean }).nshWeb !== 'undefined';
+
 const str = (v: Values, k: string): string => String(v[k] ?? '').trim();
 const trimBase = (u: string): string => u.replace(/\/+$/, '');
 
@@ -402,7 +405,25 @@ export interface UploadOptions {
   signal?: AbortSignal;
 }
 
-export function uploadFile(h: HostProfile, file: File, opts: UploadOptions = {}): Promise<string> {
+/** 单次请求超时与重试：油猴后台请求偶发挂起时自动中止并重试 */
+const ATTEMPT_TIMEOUT = 20_000;
+const MAX_ATTEMPTS = 3;
+
+export async function uploadFile(h: HostProfile, file: File, opts: UploadOptions = {}): Promise<string> {
+  let lastErr: Error = new Error('上传失败');
+  for (let i = 0; i < MAX_ATTEMPTS; i++) {
+    try {
+      return await uploadOnce(h, file, opts);
+    } catch (e) {
+      lastErr = e as Error;
+      // 只有超时（多为请求挂起）才重试；认证失败、配置错误等直接报错
+      if (!/超时/.test(lastErr.message) || opts.signal?.aborted) throw lastErr;
+    }
+  }
+  throw new Error(`${lastErr.message}（已重试 ${MAX_ATTEMPTS} 次）`);
+}
+
+function uploadOnce(h: HostProfile, file: File, opts: UploadOptions = {}): Promise<string> {
   const p = providerById(h.provider);
   if (!p) return Promise.reject(new Error('未知的图床类型'));
   const err = validateProfile(h);
@@ -426,10 +447,12 @@ export function uploadFile(h: HostProfile, file: File, opts: UploadOptions = {})
       headers: plan.headers,
       data,
       responseType: 'text',
-      timeout: 120_000,
-      upload: {
-        onprogress: (e: ProgressEvent) => e.lengthComputable && opts.onProgress?.(Math.round((e.loaded / e.total) * 100)),
-      },
+      timeout: ATTEMPT_TIMEOUT,
+      // 油猴环境不传 upload 回调：嵌套回调跨上下文传递时，部分 Tampermonkey 版本会让请求一直挂起；
+      // 代理版（platform/web.ts）走原生 XHR，仍有上传进度
+      ...(IS_WEB_PLATFORM
+        ? { upload: { onprogress: (e: ProgressEvent) => e.lengthComputable && opts.onProgress?.(Math.round((e.loaded / e.total) * 100)) } }
+        : {}),
       onload: (res) => {
         let json: unknown;
         try {
@@ -449,8 +472,24 @@ export function uploadFile(h: HostProfile, file: File, opts: UploadOptions = {})
       onerror: (e: unknown) => reject(new Error(gmErrorMessage(e, plan.url))),
       ontimeout: () => reject(new Error('上传超时')),
     };
-    const req = GM_xmlhttpRequest(details);
+    // 兜底计时：请求挂起时 ontimeout 不一定触发，到点主动中止，交给外层重试（须在发起请求前包装回调）
+    let req: { abort: () => void } | undefined;
+    const guard = window.setTimeout(() => {
+      req?.abort();
+      reject(new Error('上传超时'));
+    }, ATTEMPT_TIMEOUT + 2000);
+    const done = (): void => clearTimeout(guard);
+    const wrap = <T>(fn: T): T =>
+      ((...args: unknown[]) => {
+        done();
+        (fn as unknown as ((...a: unknown[]) => void) | undefined)?.apply(details, args);
+      }) as unknown as T;
+    details.onload = wrap(details.onload);
+    details.onerror = wrap(details.onerror);
+    details.ontimeout = wrap(details.ontimeout);
+    req = GM_xmlhttpRequest(details);
     opts.signal?.addEventListener('abort', () => {
+      done();
       req.abort();
       reject(new Error('已取消'));
     });
