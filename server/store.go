@@ -21,7 +21,11 @@ var (
 	errTooLarge     = errors.New("body too large")
 	errNotJSON      = errors.New("body is not json")
 	errTooMany      = errors.New("too many spaces")
+	errLocked       = errors.New("locked by another passphrase")
 )
+
+// lockSuffix 口令锁文件：<空间 ID>.lock，内容是第一次加密写入时的密钥标识（由口令派生，不能反推出口令）
+const lockSuffix = ".lock"
 
 // meta 每个空间在内存中只保留这点元数据，数据本体始终在磁盘上
 type meta struct {
@@ -135,13 +139,34 @@ func (s *Store) Open(id string) (*os.File, meta, error) {
 	return f, m, err
 }
 
+// Lock 读取空间的口令锁（每次从磁盘读：命令行解锁后立即生效，无需重启）
+func (s *Store) Lock(id string) string {
+	b, err := os.ReadFile(filepath.Join(s.dir, id+lockSuffix))
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(b))
+}
+
+// checkLock 空间已被锁定时，只有携带相同密钥标识的写入 / 删除才允许（调用方持有 sp.mu）
+func (s *Store) checkLock(id, keyID string) error {
+	if l := s.Lock(id); l != "" && l != keyID {
+		return errLocked
+	}
+	return nil
+}
+
 // Put 条件写入。ifMatch 为当前 ETag；ifNoneMatch 为 true 表示要求空间不存在。
+// keyID 为客户端由加密口令派生的密钥标识：空间第一次带标识写入时记下并锁定，之后标识不同的写入一律拒绝。
 // 请求体边写临时文件边计算 SHA-256，整体不进内存；成功后原子替换并广播变更。
-func (s *Store) Put(id string, body io.Reader, maxBody int64, ifMatch string, ifNoneMatch bool) (meta, error) {
+func (s *Store) Put(id string, body io.Reader, maxBody int64, ifMatch string, ifNoneMatch bool, keyID string) (meta, error) {
 	sp := s.space(id)
 	sp.mu.Lock()
 	defer sp.mu.Unlock()
 	cur, exists := s.Meta(id)
+	if err := s.checkLock(id, keyID); err != nil {
+		return cur, err
+	}
 	switch {
 	case exists && ifNoneMatch:
 		return cur, errPrecondition
@@ -192,6 +217,11 @@ func (s *Store) Put(id string, body io.Reader, maxBody int64, ifMatch string, if
 		return meta{}, err
 	}
 	ok = true
+	if keyID != "" && s.Lock(id) == "" {
+		if err := writeFileAtomic(filepath.Join(s.dir, id+lockSuffix), []byte(keyID+"\n")); err != nil {
+			return meta{}, err
+		}
+	}
 	m := meta{etag: etagOf(h.Sum(nil)), updatedAt: time.Now().UnixMilli(), size: n}
 	s.mu.Lock()
 	s.metas[id] = m
@@ -218,11 +248,14 @@ func checkJSONStart(br *bufio.Reader) error {
 	}
 }
 
-// Delete 删除空间数据
-func (s *Store) Delete(id string) error {
+// Delete 删除空间数据（已锁定的空间需携带相同密钥标识；锁本身保留）
+func (s *Store) Delete(id, keyID string) error {
 	sp := s.space(id)
 	sp.mu.Lock()
 	defer sp.mu.Unlock()
+	if err := s.checkLock(id, keyID); err != nil {
+		return err
+	}
 	if _, ok := s.Meta(id); !ok {
 		return errNotFound
 	}

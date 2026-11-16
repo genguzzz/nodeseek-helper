@@ -182,3 +182,15 @@ describe('重复表情去重', () => {
     expect(alive.length).toBe(stickerData.stickers.length);
   });
 });
+
+describe('口令锁的密钥标识', () => {
+  it('同口令同空间稳定；换口令或换空间都不同；不包含口令本身', async () => {
+    const { keyId } = await import('../src/sync/crypto');
+    const a = await keyId('pass-1', 'token-a');
+    expect(a).toMatch(/^[0-9a-f]{64}$/);
+    expect(await keyId('pass-1', 'token-a')).toBe(a);
+    expect(await keyId('pass-2', 'token-a')).not.toBe(a);
+    expect(await keyId('pass-1', 'token-b')).not.toBe(a);
+    expect(a).not.toContain(Buffer.from('pass-1').toString('hex'));
+  });
+});

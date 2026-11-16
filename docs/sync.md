@@ -108,6 +108,10 @@ Envelope（信封，后端只看到它）
 | `GET` | `/v1/sync/watch?etag=<etag>&timeout=25` | 长轮询：版本与 `etag` 不同时立即返回 `200 {"etag","updatedAt"}`；超时返回 `304`；`timeout` 上限 55 秒 |
 | `DELETE` | `/v1/sync` | 删除本空间数据，返回 `204` |
 
+**口令锁**：`PUT` / `DELETE` 可带 `X-NSH-Key-Id: <hex>`（客户端由加密口令派生的密钥标识，见下）。空间第一次带标识的写入成功后，服务端把它记在 `<空间ID>.lock`；之后标识不同（含不带标识）的写入与删除返回 `403`，并带响应头 `X-NSH-Locked: 1`。已锁定空间的 `GET` 也带该响应头。锁只能由管理员在服务器上执行 `token unlock` 解除。
+
+密钥标识 = hex( PBKDF2-SHA256( 口令, salt = `"nsh-sync/key-id/v1" 0x00 令牌`, 210000 次, 256 bit ) )。与加密用的密钥（每次随机 salt）不同，单向派生，服务端不能由它反推口令或解密数据；salt 含令牌，不同空间用相同口令得到的标识也不同。
+
 - ETag：响应体 SHA-256 前 16 字节的 hex，带双引号（`"a1b2…"`）。
 - 请求体上限默认 2 MiB（`413`），必须是以 `{` 开头的 JSON（`400`）。
 - CORS：允许任意来源，允许 `Authorization, Content-Type, If-Match, If-None-Match`，暴露 `ETag, X-Updated-At`。

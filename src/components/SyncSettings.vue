@@ -16,14 +16,8 @@ const setTimeout = (fn: () => void, ms: number): number => window.setTimeout(fn,
 const codeInput = ref('');
 const codeError = ref('');
 const useCode = computed(() => (!provider.value || provider.value.id === 'selfhost') && !manual.value);
-const configuredHost = computed(() => {
-  const base = syncConfig.provider === 'selfhost' ? syncConfig.values.selfhost?.base : '';
-  try {
-    return base ? new URL(base).host : '';
-  } catch {
-    return base ?? '';
-  }
-});
+/** 已接入自建服务（不在界面上显示服务地址） */
+const configured = computed(() => syncConfig.provider === 'selfhost' && !!syncConfig.values.selfhost?.base && !!syncConfig.values.selfhost?.token);
 
 function applyCode(): void {
   codeError.value = '';
@@ -152,7 +146,7 @@ function disable(): void {
           @keydown.enter="applyCode"
         />
         <div v-if="codeError" class="nsh-help nsh-code-error">{{ codeError }}</div>
-        <div v-else-if="configuredHost" class="nsh-help">已配置：{{ configuredHost }}，粘贴新的同步码可替换</div>
+        <div v-else-if="configured" class="nsh-help">已接入同步服务；粘贴新的同步码 / 接入码可替换</div>
         <div v-else class="nsh-help">已有设备在同步：在那台设备的「同步」页点「复制接入码」（含加密口令），粘贴到这里即可。首次使用请粘贴服务端日志打印的同步码</div>
         <a href="javascript:void(0)" class="nsh-link nsh-mode-switch" @click="manual = true">没有同步码？选择其他方式 / 手动填写地址和令牌</a>
       </div>

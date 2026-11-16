@@ -1,9 +1,9 @@
 import { reactive, toRaw, watch } from 'vue';
 import { GM_getValue, GM_setValue } from '$';
 import { isApplyingRemote, settings, stickerData, uid } from '../core/store';
-import { open, PassphraseError, seal } from './crypto';
+import { keyId, open, PassphraseError, seal } from './crypto';
 import { applyDoc, buildLocalDoc, dedupeByUrl, docHash, mergeDocs, type SyncMeta } from './format';
-import { ConflictError, missingFields, syncProviderById, type Values } from './providers';
+import { ConflictError, missingFields, syncProviderById, type SyncProvider, type Values } from './providers';
 import { decodeSyncCode } from './sync-code';
 
 /** 本机同步配置：不参与同步（含后端凭据与加密口令） */
@@ -61,6 +61,12 @@ watch(
 window.addEventListener('pagehide', () => saveTimer && flushConfig());
 
 const valuesOf = (id: string): Values => (syncConfig.values[id] ??= {});
+
+/** 写入时附带的密钥标识：只有支持口令锁的后端、且设置了口令时才有 */
+async function keyIdFor(p: SyncProvider, v: Values): Promise<string | undefined> {
+  const scope = p.keyScope?.(v);
+  return scope && syncConfig.passphrase ? keyId(syncConfig.passphrase, scope) : undefined;
+}
 
 /** 切换后端或口令后，远端版本对不上，需要从头比对 */
 export function resetSyncCursor(): void {
@@ -141,7 +147,7 @@ export async function syncNow(reason = 'manual'): Promise<void> {
       try {
         next.updatedAt = Date.now();
         next.device = syncConfig.deviceId;
-        syncConfig.lastEtag = await p.push(v, await seal(next, syncConfig.passphrase), pulled.status === 'empty' ? undefined : etag);
+        syncConfig.lastEtag = await p.push(v, await seal(next, syncConfig.passphrase), pulled.status === 'empty' ? undefined : etag, await keyIdFor(p, v));
         const upd = p.updates?.(v);
         if (upd) Object.assign(v, upd);
         break;
@@ -185,7 +191,7 @@ export async function overwriteRemote(): Promise<void> {
     const v = valuesOf(p.id);
     const pulled = await p.pull(v);
     const doc = buildLocalDoc(syncConfig.meta, syncConfig.deviceId);
-    syncConfig.lastEtag = await p.push(v, await seal(doc, syncConfig.passphrase), pulled.status === 'empty' ? undefined : pulled.etag);
+    syncConfig.lastEtag = await p.push(v, await seal(doc, syncConfig.passphrase), pulled.status === 'empty' ? undefined : pulled.etag, await keyIdFor(p, v));
     if (changeGen === gen) syncConfig.dirty = false;
     syncConfig.lastSyncAt = Date.now();
     syncConfig.lastError = '';

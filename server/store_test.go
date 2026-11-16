@@ -16,7 +16,7 @@ func TestOpenEtagMatchesContentUnderConcurrentPut(t *testing.T) {
 		t.Fatal(err)
 	}
 	const id = "space"
-	if _, err := store.Put(id, strings.NewReader(`{"v":0}`), 1<<20, "", true); err != nil {
+	if _, err := store.Put(id, strings.NewReader(`{"v":0}`), 1<<20, "", true, ""); err != nil {
 		t.Fatal(err)
 	}
 	var wg sync.WaitGroup
@@ -33,7 +33,7 @@ func TestOpenEtagMatchesContentUnderConcurrentPut(t *testing.T) {
 			cur, _ := store.Meta(id)
 			// 不同长度的内容，避免偶然相同
 			body := fmt.Sprintf(`{"v":%d,"pad":"%s"}`, i, strings.Repeat("x", i%50))
-			if _, err := store.Put(id, strings.NewReader(body), 1<<20, cur.etag, false); err != nil && err != errPrecondition {
+			if _, err := store.Put(id, strings.NewReader(body), 1<<20, cur.etag, false, ""); err != nil && err != errPrecondition {
 				t.Error(err)
 				return
 			}
@@ -65,12 +65,12 @@ func TestDeleteWakesWatchersAndResetsVersion(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	m, err := store.Put("s", strings.NewReader(`{}`), 1024, "", true)
+	m, err := store.Put("s", strings.NewReader(`{}`), 1024, "", true, "")
 	if err != nil {
 		t.Fatal(err)
 	}
 	ch := store.Changed("s")
-	if err := store.Delete("s"); err != nil {
+	if err := store.Delete("s", ""); err != nil {
 		t.Fatal(err)
 	}
 	select {
@@ -78,10 +78,10 @@ func TestDeleteWakesWatchersAndResetsVersion(t *testing.T) {
 	default:
 		t.Fatal("删除后长轮询没有被唤醒")
 	}
-	if _, err := store.Put("s", strings.NewReader(`{}`), 1024, m.etag, false); err != errPrecondition {
+	if _, err := store.Put("s", strings.NewReader(`{}`), 1024, m.etag, false, ""); err != errPrecondition {
 		t.Fatalf("删除后用旧 ETag 写入应冲突，得到 %v", err)
 	}
-	if _, err := store.Put("s", strings.NewReader(`{}`), 1024, "", true); err != nil {
+	if _, err := store.Put("s", strings.NewReader(`{}`), 1024, "", true, ""); err != nil {
 		t.Fatalf("删除后按新建写入应成功：%v", err)
 	}
 }

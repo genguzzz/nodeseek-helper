@@ -17,6 +17,9 @@ export interface Envelope {
 
 export class PassphraseError extends Error {}
 
+/** 自建服务的空间已被另一个加密口令锁定（服务端按密钥标识拒绝写入） */
+export class LockedError extends PassphraseError {}
+
 const toB64 = (buf: ArrayBuffer | Uint8Array): string => {
   const bytes = buf instanceof Uint8Array ? buf : new Uint8Array(buf);
   let s = '';
@@ -74,4 +77,25 @@ export async function open(env: Envelope, passphrase: string): Promise<SyncDocum
   const doc = JSON.parse(new TextDecoder().decode(bytes)) as SyncDocument;
   if (doc.schema !== 'nsh-sync/1') throw new Error(`不支持的同步文档版本：${String(doc.schema)}`);
   return doc;
+}
+
+const keyIdCache = new Map<string, Promise<string>>();
+
+/**
+ * 密钥标识：由加密口令与空间（令牌）派生的固定值，随写入发给自建服务，用于「第一个设置口令的人锁定空间」。
+ * PBKDF2 单向派生，服务端拿到它也无法反推出口令、更解不开数据；不同空间即使口令相同，标识也不同。
+ */
+export function keyId(passphrase: string, scope: string): Promise<string> {
+  const cacheKey = `${scope}\u0000${passphrase}`;
+  let p = keyIdCache.get(cacheKey);
+  if (!p) {
+    p = (async () => {
+      const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(passphrase), 'PBKDF2', false, ['deriveBits']);
+      const salt = new TextEncoder().encode(`nsh-sync/key-id/v1\u0000${scope}`);
+      const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt, iterations: PBKDF2_ITER }, base, 256);
+      return Array.from(new Uint8Array(bits), (b) => b.toString(16).padStart(2, '0')).join('');
+    })();
+    keyIdCache.set(cacheKey, p);
+  }
+  return p;
 }

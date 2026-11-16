@@ -46,6 +46,10 @@ func main() {
 		fmt.Println(EncodeSyncCode(os.Args[2], os.Args[3]))
 		return
 	}
+	// 子命令：nsh-sync-server token add|list|revoke|unlock，管理同步码（不开放任何注册接口）
+	if len(os.Args) > 1 && os.Args[1] == "token" {
+		os.Exit(runTokenCmd(os.Args[2:], os.Stdout, os.Stderr))
+	}
 	addr := flag.String("addr", env("NSH_ADDR", ":8787"), "监听地址")
 	dataDir := flag.String("data", env("NSH_DATA", "./data"), "数据目录")
 	maxBody := flag.Int64("max-body", envInt("NSH_MAX_BODY", 2<<20), "单个空间数据上限（字节）")
@@ -73,9 +77,9 @@ func main() {
 		}
 	}
 	open := os.Getenv("NSH_OPEN") == "1"
-	if len(tokens) == 0 && !open {
-		fmt.Fprintln(os.Stderr, "请设置 NSH_TOKENS（逗号分隔的访问令牌），或设置 NSH_OPEN=1 开放注册")
-		os.Exit(2)
+	registry := NewRegistry(*dataDir)
+	if registered, _ := ListTokens(*dataDir); len(tokens) == 0 && len(registered) == 0 && !open {
+		slog.Warn("还没有任何令牌：用 `nsh-sync-server token add` 生成同步码（无需重启），或设置 NSH_TOKENS")
 	}
 	// 设置了对外访问地址时，启动时为每个令牌打印同步码，客户端粘贴即可完成配置
 	if pub := strings.TrimSpace(os.Getenv("NSH_PUBLIC_URL")); pub != "" {
@@ -92,6 +96,7 @@ func main() {
 		Addr: *addr,
 		Handler: NewServer(Config{
 			Tokens:      tokens,
+			Registry:    registry,
 			Open:        open,
 			MaxBody:     *maxBody,
 			MaxWatchers: *maxWatchers,

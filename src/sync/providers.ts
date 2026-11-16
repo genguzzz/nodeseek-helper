@@ -1,6 +1,6 @@
 import { GM_xmlhttpRequest } from '$';
 import { gmErrorMessage, type FieldDef } from '../core/uploaders';
-import type { Envelope } from './crypto';
+import { LockedError, type Envelope } from './crypto';
 
 /* ---------------- 通用 HTTP ---------------- */
 
@@ -67,8 +67,10 @@ export interface SyncProvider {
   homepage?: string;
   fields: FieldDef[];
   pull(v: Values, etag?: string): Promise<PullResult>;
-  /** 返回新的 etag；版本冲突抛 ConflictError */
-  push(v: Values, env: Envelope, etag?: string): Promise<string>;
+  /** 返回新的 etag；版本冲突抛 ConflictError。keyId：加密口令的密钥标识（仅支持口令锁的后端使用） */
+  push(v: Values, env: Envelope, etag?: string, keyId?: string): Promise<string>;
+  /** 可选：支持「第一个设置口令的人锁定空间」的后端，返回派生密钥标识用的空间标识 */
+  keyScope?: (v: Values) => string;
   /** 可选：长轮询，远端变化返回 true，超时返回 false */
   watch?(v: Values, etag: string, signal: AbortSignal): Promise<boolean>;
   /** 可选：首次推送后需要回写到配置里的值（如自动创建的 Gist ID） */
@@ -96,7 +98,7 @@ const selfhost: SyncProvider = {
   desc: '本项目的 Go 同步服务（单文件 / Docker，常驻内存 < 10MB），支持长轮询实时同步',
   fields: [
     { key: 'base', label: '服务地址', type: 'text', required: true, placeholder: 'https://sync.example.com' },
-    { key: 'token', label: '访问令牌', type: 'password', required: true, help: '服务端 NSH_TOKENS 中的一个；每个令牌是独立的空间' },
+    { key: 'token', label: '访问令牌', type: 'password', required: true, help: '服务端发给你的令牌；每个令牌是独立的空间' },
   ],
   async pull(v, etag) {
     const r = await http('GET', `${trimBase(v.base)}/v1/sync`, { Authorization: `Bearer ${v.token}`, ...(etag ? { 'If-None-Match': etag } : {}) });
@@ -105,13 +107,18 @@ const selfhost: SyncProvider = {
     if (r.status !== 200) fail(r, '拉取失败');
     return { status: 'ok', etag: r.headers.etag, envelope: parseEnvelope(r.text) };
   },
-  async push(v, env, etag) {
+  keyScope: (v) => v.token ?? '',
+  async push(v, env, etag, keyId) {
     const r = await http('PUT', `${trimBase(v.base)}/v1/sync`, {
       Authorization: `Bearer ${v.token}`,
       'Content-Type': 'application/json',
       ...(etag ? { 'If-Match': etag } : { 'If-None-Match': '*' }),
+      ...(keyId ? { 'X-NSH-Key-Id': keyId } : {}),
     }, JSON.stringify(env));
     if (r.status === 412) throw new ConflictError();
+    if (r.status === 403 && r.headers['x-nsh-locked'] === '1') {
+      throw new LockedError('这个同步空间已被另一个加密口令锁定：请填写最初设置的口令，或在已同步的设备上复制「接入码」粘贴到这里。忘记口令只能请服务端管理员解锁');
+    }
     if (r.status !== 200) fail(r, '推送失败');
     return r.headers.etag || (JSON.parse(r.text) as { etag: string }).etag;
   },

@@ -17,7 +17,8 @@ import (
 
 // Config 服务配置
 type Config struct {
-	Tokens      map[string]bool // 允许的令牌（已规整）
+	Tokens      map[string]bool // 环境变量 NSH_TOKENS 里的令牌（已规整）
+	Registry    *Registry       // 命令行登记的令牌（可为 nil）；增删无需重启
 	Open        bool            // 开放注册：任意长度 >= 16 的令牌
 	MaxBody     int64
 	MaxWatchers int64
@@ -42,6 +43,8 @@ const (
 	defaultWatchS   = 25
 	maxWatchS       = 55
 	headerUpdated   = "X-Updated-At"
+	headerKeyID     = "X-NSH-Key-Id"
+	headerLocked    = "X-NSH-Locked"
 	contentTypeJSON = "application/json"
 )
 
@@ -104,7 +107,7 @@ func (s *Server) route(w *statusRecorder, r *http.Request) string {
 	case http.MethodPut:
 		s.put(w, r, sid)
 	case http.MethodDelete:
-		s.del(w, sid)
+		s.del(w, r, sid)
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	}
@@ -120,7 +123,7 @@ func (s *Server) auth(r *http.Request) (string, bool) {
 	if tok == "" {
 		return "", false
 	}
-	if s.cfg.Tokens[tok] || (s.cfg.Open && len(tok) >= minOpenToken) {
+	if s.cfg.Tokens[tok] || (s.cfg.Registry != nil && s.cfg.Registry.Has(tok)) || (s.cfg.Open && len(tok) >= minOpenToken) {
 		return spaceID(tok), true
 	}
 	return "", false
@@ -142,6 +145,9 @@ func (s *Server) get(w http.ResponseWriter, r *http.Request, sid string) {
 	h.Set(headerUpdated, strconv.FormatInt(m.updatedAt, 10))
 	h.Set("Cache-Control", "no-store")
 	h.Set("Content-Type", contentTypeJSON)
+	if s.store.Lock(sid) != "" {
+		h.Set(headerLocked, "1")
+	}
 	if matchETag(r.Header.Get("If-None-Match"), m.etag) {
 		w.WriteHeader(http.StatusNotModified)
 		return
@@ -157,8 +163,10 @@ func (s *Server) put(w http.ResponseWriter, r *http.Request, sid string) {
 	}
 	ifMatch := strings.TrimSpace(r.Header.Get("If-Match"))
 	ifNone := strings.TrimSpace(r.Header.Get("If-None-Match")) == "*"
-	m, err := s.store.Put(sid, r.Body, s.cfg.MaxBody, ifMatch, ifNone)
+	m, err := s.store.Put(sid, r.Body, s.cfg.MaxBody, ifMatch, ifNone, keyIDOf(r))
 	switch {
+	case errors.Is(err, errLocked):
+		writeLocked(w)
 	case errors.Is(err, errPrecondition):
 		if m.etag != "" {
 			w.Header().Set("ETag", m.etag)
@@ -179,8 +187,12 @@ func (s *Server) put(w http.ResponseWriter, r *http.Request, sid string) {
 	}
 }
 
-func (s *Server) del(w http.ResponseWriter, sid string) {
-	err := s.store.Delete(sid)
+func (s *Server) del(w http.ResponseWriter, r *http.Request, sid string) {
+	err := s.store.Delete(sid, keyIDOf(r))
+	if errors.Is(err, errLocked) {
+		writeLocked(w)
+		return
+	}
 	if errors.Is(err, errNotFound) {
 		writeJSON(w, http.StatusNotFound, map[string]string{"message": "尚无数据"})
 		return
@@ -228,10 +240,29 @@ func (s *Server) watch(w http.ResponseWriter, r *http.Request, sid string) {
 
 func cors(h http.Header) {
 	h.Set("Access-Control-Allow-Origin", "*")
-	h.Set("Access-Control-Allow-Headers", "Authorization, Content-Type, If-Match, If-None-Match")
+	h.Set("Access-Control-Allow-Headers", "Authorization, Content-Type, If-Match, If-None-Match, X-NSH-Key-Id")
 	h.Set("Access-Control-Allow-Methods", "GET, HEAD, PUT, DELETE, OPTIONS")
-	h.Set("Access-Control-Expose-Headers", "ETag, X-Updated-At")
+	h.Set("Access-Control-Expose-Headers", "ETag, X-Updated-At, X-NSH-Locked")
 	h.Set("Access-Control-Max-Age", "86400")
+}
+
+// keyIDOf 客户端由加密口令派生的密钥标识（未加密时为空）；只允许十六进制，长度 16–128
+func keyIDOf(r *http.Request) string {
+	k := strings.ToLower(strings.TrimSpace(r.Header.Get(headerKeyID)))
+	if len(k) < 16 || len(k) > 128 {
+		return ""
+	}
+	for _, c := range k {
+		if (c < '0' || c > '9') && (c < 'a' || c > 'f') {
+			return ""
+		}
+	}
+	return k
+}
+
+func writeLocked(w http.ResponseWriter) {
+	w.Header().Set(headerLocked, "1")
+	writeJSON(w, http.StatusForbidden, map[string]string{"message": "这个同步空间已被另一个加密口令锁定"})
 }
 
 func matchETag(header, etag string) bool {
