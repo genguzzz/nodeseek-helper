@@ -12,11 +12,12 @@ const base = (process.env.NSH_PUBLISH_BASE || PLACEHOLDER).replace(/\/+$/, '');
 const version = pkg.version;
 const script = `${base}/nsh-proxy.js`;
 
-const hosts = ['www.nodeseek.com', 'nodeseek.com', 'www.deepflood.com', 'deepflood.com'];
-const SITE = String.raw`^https?:\/\/(www\.)?(nodeseek|deepflood)\.com`;
-// 页面：路径不含扩展名，排除接口与静态资源
-const PAGE = String.raw`${SITE}\/(?!__nsh\/|api\/|static\/|assets\/|cdn-cgi\/)[^.?]*(\?.*)?$`;
-const NSH = String.raw`${SITE}\/__nsh\/(relay|app\.js)`;
+// 只解密 www 站点：裸域名只做 301 跳转到 www，无需 MITM，缩小影响面
+const hosts = ['www.nodeseek.com', 'www.deepflood.com'];
+const SITE = String.raw`^https:\/\/www\.(nodeseek|deepflood)\.com`;
+// 页面：只匹配页面路由白名单（不用前瞻断言等引擎差异大的语法），接口 / 静态资源 / Cloudflare 校验一律不经过脚本
+export const PAGE = String.raw`${SITE}\/(|page-\d+|post-\d+(-\d+)?|categories\/[\w-]+(\/page-\d+)?|space\/\d+|notification|new-discussion|edit-discussion|search|member|board|award|setting)(\?[^\s]*)?$`;
+export const NSH = String.raw`${SITE}\/__nsh\/(relay|app\.js)(\?[^\s]*)?$`;
 const NAME = 'NodeSeek 助手';
 const DESC = '粘贴图片自动上传图床、表情包管理与快捷发送（与油猴脚本同一份代码）';
 
@@ -65,13 +66,13 @@ http:
   mitm:
 ${hosts.map((h) => `    - "${h}"`).join('\n')}
   script:
-    - match: ${PAGE}
+    - match: '${PAGE}'
       name: nsh-proxy
       type: response
       require-body: true
       max-size: 4194304
       timeout: 10
-    - match: ${NSH}
+    - match: '${NSH}'
       name: nsh-proxy
       type: request
       require-body: true
@@ -86,6 +87,8 @@ script-providers:
 `,
 };
 
+if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
 for (const [file, content] of Object.entries(outputs)) fs.writeFileSync(path.join(dist, file), content);
 console.log(`proxy artifacts (v${version}) → dist/  base=${base}`);
 if (base === PLACEHOLDER) console.warn('⚠ 未设置 NSH_PUBLISH_BASE，模块里的脚本地址是占位符，发布前请设置后重新构建');
+}
