@@ -25,7 +25,7 @@ jobs:
       - run: npm i -g npm@11.6.2 && npm ci
       - run: npm run typecheck && npx vitest run
       - name: 构建油猴脚本与代理模块
-        run: NSH_PUBLISH_BASE=$PUBLISH_BASE npm run build
+        run: NSH_PUBLISH_BASE=$PUBLISH_BASE NSH_PROXY_BASE=https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }} npm run build
 
       - uses: actions/setup-go@v5
         with:

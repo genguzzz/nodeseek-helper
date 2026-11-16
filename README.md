@@ -31,6 +31,8 @@
 | **Loon** | 插件：`https://github.com/genguzzz/nodeseek-helper/releases/latest/download/nodeseek-helper.plugin` |
 | **Stash** | 覆写：`https://github.com/genguzzz/nodeseek-helper/releases/latest/download/nodeseek-helper.stoverride` |
 
+> 想固定某个版本（或怀疑 `latest` 跳转被缓存）时，把地址里的 `latest/download` 换成 `download/v<版本号>`，如 `releases/download/v0.3.3/nodeseek-helper.sgmodule`。模块内的脚本地址始终指向它所属的版本，不会新旧混用。
+
 > 代理版本需要开启 MITM 并信任证书，模块已声明 `nodeseek.com`、`deepflood.com` 两个域名。
 > 代理版本运行在手机浏览器等任意环境中，无需安装扩展；配置保存在站点的本地存储里，可用「配置同步」或「配置导入 / 导出」与油猴版互通。
 

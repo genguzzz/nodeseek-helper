@@ -8,7 +8,9 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const dist = path.join(root, 'dist');
 const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
 const PLACEHOLDER = 'https://cdn.jsdelivr.net/gh/<github-user>/nodeseek-helper@main/dist';
-const base = (process.env.NSH_PUBLISH_BASE || PLACEHOLDER).replace(/\/+$/, '');
+// 代理模块固定指向本版本的发布地址（NSH_PROXY_BASE，如 releases/download/v1.2.3），避免 latest 跳转被缓存导致新旧混用；
+// 油猴脚本的自动更新地址仍用 NSH_PUBLISH_BASE（latest）
+const base = (process.env.NSH_PROXY_BASE || process.env.NSH_PUBLISH_BASE || PLACEHOLDER).replace(/\/+$/, '');
 const version = pkg.version;
 const script = `${base}/nsh-proxy.js`;
 
