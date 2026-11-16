@@ -42,16 +42,16 @@
 }
 
 /* ========== 注入到原生编辑器的元素 ========== */
-.md-editor .nsh-tb,
-.md-editor .nsh-top {
+:is(.md-editor, .message-input) .nsh-tb,
+:is(.md-editor, .message-input) .nsh-top {
   display: inline-flex;
   align-items: center;
   color: inherit;
 }
-.md-editor .nsh-top svg {
+:is(.md-editor, .message-input) .nsh-top svg {
   display: block;
 }
-.md-editor.nsh-dragging .CodeMirror {
+:is(.md-editor, .message-input).nsh-dragging .CodeMirror {
   outline: 2px dashed #2ea44f;
   outline-offset: -4px;
   background-image: linear-gradient(rgba(46, 164, 79, 0.06), rgba(46, 164, 79, 0.06));
@@ -62,10 +62,10 @@
 #editor-body:has(.mde-toolbar) .nsh-top-emoji {
   display: none !important;
 }
-.md-editor .nsh-tb.nsh-active {
+:is(.md-editor, .message-input) .nsh-tb.nsh-active {
   background-color: rgba(0, 0, 0, 0.08);
 }
-.dark-layout .md-editor .nsh-tb.nsh-active {
+.dark-layout :is(.md-editor, .message-input) .nsh-tb.nsh-active {
   background-color: rgba(255, 255, 255, 0.1);
 }
 
@@ -345,4 +345,20 @@ html.nsh-scroll-lock body {
 .nsh-fast-menu-item:hover {
   background: var(--glass-color, rgba(0, 0, 0, 0.05));
   color: var(--main-color, #2ea44f);
+}
+
+/* 界面入口开关 */
+html.nsh-hide-upload .nsh-tb-upload,
+html.nsh-hide-upload .nsh-top-upload,
+html.nsh-hide-sticker .nsh-tb-emoji,
+html.nsh-hide-sticker .nsh-top-emoji,
+html.nsh-hide-fastnav .nsh-fast-btn,
+html.nsh-hide-header .nsh-head-entry {
+  display: none !important;
+}
+
+/* 原生表情栏已并入工具栏表情面板：隐藏以节省空间（App 功能仍可从面板触发） */
+html.nsh-hide-native-exp .md-editor .expression,
+html.nsh-hide-native-exp .md-editor .exp-container {
+  display: none !important;
 }

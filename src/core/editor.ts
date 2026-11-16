@@ -5,6 +5,8 @@ import { imageFilesOf, uploadMany, type CM } from './upload-flow';
 import { ICON_EMOJI, ICON_GEAR, ICON_UPLOAD } from './icons';
 
 const ENHANCED = 'nshEnhanced';
+/** 发帖 / 回复编辑器（.md-editor）与私信输入框（.message-input）结构相同：工具栏 + CodeMirror */
+const EDITOR_SELECTOR = '.md-editor, .message-input';
 
 /** 取页面里的 CodeMirror 5 实例（兼容油猴沙箱 / Firefox Xray） */
 export function getCM(md: Element): CM | undefined {
@@ -32,7 +34,7 @@ function injectToolbar(md: Element, cm: CM): void {
   if (!bar || bar.querySelector('.nsh-tb')) return;
   const ref = bar.querySelector('.toolbar-item[title="图片"]') ?? bar.querySelector('.toolbar-item');
   const btn = document.createElement('span');
-  btn.className = 'toolbar-item i-icon nsh-tb';
+  btn.className = 'toolbar-item i-icon nsh-tb nsh-tb-upload';
   btn.title = '上传图片到图床（也可直接粘贴 / 拖拽）';
   btn.innerHTML = ICON_UPLOAD;
   copyScope(ref, btn);
@@ -47,7 +49,7 @@ function injectToolbar(md: Element, cm: CM): void {
   copyScope(ref, emoji);
   emoji.addEventListener('click', (e) => {
     e.stopPropagation();
-    togglePicker(emoji, (text) => insertText(cm, text));
+    togglePicker(emoji, (text) => insertText(cm, text), md as HTMLElement);
   });
   ref ? ref.after(btn, emoji) : bar.append(btn, emoji);
 }
@@ -76,7 +78,8 @@ function injectTopButtons(md: Element, cm: CM): void {
     return a;
   };
   const upload = make('上传图片到图床', ICON_UPLOAD, () => pickFiles(cm));
-  const emoji = make('表情包', ICON_EMOJI, () => togglePicker(emoji, (text) => insertText(cm, text)));
+  upload.classList.add('nsh-top-upload');
+  const emoji = make('表情包', ICON_EMOJI, () => togglePicker(emoji, (text) => insertText(cm, text), md as HTMLElement));
   emoji.classList.add('nsh-top-emoji');
   const gear = make('NodeSeek 助手设置', ICON_GEAR, () => openPanel());
   ref ? ref.before(emoji, upload, gear) : top.append(emoji, upload, gear);
@@ -139,7 +142,7 @@ export function watchEditors(): void {
   let scheduled = false;
   const scan = (): void => {
     scheduled = false;
-    document.querySelectorAll<HTMLElement>('.md-editor').forEach(enhanceEditor);
+    document.querySelectorAll<HTMLElement>(EDITOR_SELECTOR).forEach(enhanceEditor);
   };
   scan();
   new MutationObserver(() => {

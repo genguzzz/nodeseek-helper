@@ -23,7 +23,8 @@ const style = computed(() => {
 <template>
   <Transition name="nsh-pop">
     <div v-if="ui.preview" class="nsh-preview" :style="style">
-      <img :src="ui.preview.url" :alt="ui.preview.name" referrerpolicy="no-referrer" />
+      <video v-if="ui.preview.video" :src="ui.preview.video" :poster="ui.preview.url" autoplay loop muted playsinline />
+      <img v-else :src="ui.preview.url" :alt="ui.preview.name" referrerpolicy="no-referrer" />
       <div v-if="ui.preview.name" class="nsh-preview-name">{{ ui.preview.name }}</div>
     </div>
   </Transition>
@@ -40,6 +41,12 @@ const style = computed(() => {
   box-shadow: var(--nsh-shadow);
   pointer-events: none;
   text-align: center;
+}
+.nsh-preview video {
+  display: block;
+  width: 160px;
+  height: 160px;
+  margin: 0 auto;
 }
 .nsh-preview img {
   display: block;

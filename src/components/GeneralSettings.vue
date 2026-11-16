@@ -3,6 +3,7 @@ import { ref } from 'vue';
 import { GM_setClipboard } from '$';
 import { exportConfig, importConfig, settings } from '../core/store';
 import { toast } from '../core/ui';
+import { importSyncConfig, syncNow } from '../sync/engine';
 
 const withStickers = ref(false);
 const importText = ref('');
@@ -27,13 +28,21 @@ function doExport(copy: boolean): void {
 
 function applyImport(text: string): void {
   try {
-    const r = importConfig(text);
+    const syncApplied = importSyncConfig(JSON.parse(text));
+    let r: ReturnType<typeof importConfig> = { hostsAdded: 0, hostsUpdated: 0, settingsApplied: false };
+    try {
+      r = importConfig(text);
+    } catch (e) {
+      if (!syncApplied) throw e;
+    }
     const parts = [
       r.hostsAdded && `新增图床 ${r.hostsAdded} 个`,
       r.hostsUpdated && `更新图床 ${r.hostsUpdated} 个`,
       r.settingsApplied && '通用设置已应用',
       r.stickers && `表情 +${r.stickers.added}`,
+      syncApplied && '同步已配置，正在同步',
     ].filter(Boolean);
+    if (syncApplied) void syncNow('manual');
     toast(`导入成功：${parts.join('，')}`, 'success', 4000);
     importText.value = '';
   } catch (e) {
@@ -47,7 +56,25 @@ async function onImportFile(e: Event): Promise<void> {
   (e.target as HTMLInputElement).value = '';
 }
 
-type BoolKey = 'pasteUpload' | 'dropUpload' | 'compress' | 'collectFromPost' | 'freezeAnimated' | 'hoverPreview';
+type BoolKey =
+  | 'pasteUpload'
+  | 'dropUpload'
+  | 'compress'
+  | 'collectFromPost'
+  | 'freezeAnimated'
+  | 'hoverPreview'
+  | 'showUploadButton'
+  | 'showStickerButton'
+  | 'showFastNav'
+  | 'showHeaderEntry'
+  | 'hideNativeStickerBar';
+const entryToggles: { key: BoolKey; label: string; help: string }[] = [
+  { key: 'showUploadButton', label: '上传图片按钮', help: '编辑器工具栏与右上角的「云朵上传」按钮；关闭后仍可粘贴 / 拖拽上传' },
+  { key: 'showStickerButton', label: '表情按钮', help: '编辑器工具栏的笑脸按钮（工具栏隐藏时显示在右上角）' },
+  { key: 'showFastNav', label: '右下角助手按钮', help: '回到顶部按钮上方的「助手」快捷菜单' },
+  { key: 'showHeaderEntry', label: '顶部导航图标', help: '导航栏主题切换旁的花火图标' },
+  { key: 'hideNativeStickerBar', label: '隐藏底部原生表情栏', help: '官方表情（AC娘 / 洋葱头 / 小黄鸡 / Fluent）与 App 功能已并入工具栏表情面板，隐藏后编辑器更紧凑' },
+];
 const toggles: { key: BoolKey; label: string; help: string }[] = [
   { key: 'pasteUpload', label: '粘贴图片自动上传', help: '在回复 / 发帖编辑器中 Ctrl+V 截图或图片时自动上传并插入' },
   { key: 'dropUpload', label: '拖拽图片自动上传', help: '把图片文件拖进编辑器即可上传' },
@@ -93,6 +120,16 @@ const toggles: { key: BoolKey; label: string; help: string }[] = [
           <div class="nsh-help">超过该宽度等比缩小，0 为不缩放</div>
         </div>
       </div>
+    </div>
+
+    <h3 class="nsh-h3 nsh-mt">界面入口</h3>
+    <p class="nsh-desc">关闭的入口不会显示，相关功能可从其他入口或油猴菜单打开。</p>
+    <div v-for="t in entryToggles" :key="t.key" class="nsh-row">
+      <div class="nsh-row-text">
+        <div>{{ t.label }}</div>
+        <div class="nsh-help">{{ t.help }}</div>
+      </div>
+      <button class="nsh-switch" :class="{ on: settings[t.key] }" @click="settings[t.key] = !settings[t.key]" />
     </div>
 
     <h3 class="nsh-h3 nsh-mt">插入格式</h3>

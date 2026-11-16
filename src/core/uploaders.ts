@@ -549,3 +549,23 @@ export async function detectImgBed(base: string): Promise<SiteDetectResult> {
   }
   return { values, notes };
 }
+
+/** 下载图片为 Blob（油猴走 GM_xmlhttpRequest，代理版走同源中转的二进制模式） */
+export function downloadImage(url: string): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    GM_xmlhttpRequest({
+      url,
+      method: 'GET',
+      responseType: 'blob',
+      timeout: 60_000,
+      onload: (r) => {
+        const blob = (r as unknown as { response: Blob }).response;
+        if (r.status >= 400 || !(blob instanceof Blob)) return reject(new Error(`下载失败：HTTP ${r.status}`));
+        if (!blob.type.startsWith('image/') && blob.size < 64) return reject(new Error('下载到的不是图片'));
+        resolve(blob);
+      },
+      onerror: (e: unknown) => reject(new Error(gmErrorMessage(e, url))),
+      ontimeout: () => reject(new Error('下载超时')),
+    });
+  });
+}

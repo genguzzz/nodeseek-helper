@@ -3,7 +3,7 @@ import { computed, onBeforeUnmount, ref } from 'vue';
 import { settings } from '../core/store';
 import { hidePreview, isAnimatedUrl, showPreview } from '../core/ui';
 
-const props = withDefaults(defineProps<{ url: string; name?: string; size?: number; preview?: boolean }>(), {
+const props = withDefaults(defineProps<{ url: string; name?: string; size?: number; preview?: boolean; video?: string }>(), {
   name: '',
   size: 64,
   preview: true,
@@ -38,7 +38,7 @@ function onLoad(e: Event): void {
 function enter(): void {
   hovering.value = true;
   if (!props.preview || !settings.hoverPreview) return;
-  timer = window.setTimeout(() => root.value && showPreview(root.value, props.url, props.name), 260);
+  timer = window.setTimeout(() => root.value && showPreview(root.value, props.url, props.name, props.video), 260);
 }
 
 function leave(): void {
@@ -50,7 +50,7 @@ function leave(): void {
 /** 移动端长按预览 */
 let pressTimer = 0;
 function touchStart(): void {
-  pressTimer = window.setTimeout(() => root.value && showPreview(root.value, props.url, props.name), 420);
+  pressTimer = window.setTimeout(() => root.value && showPreview(root.value, props.url, props.name, props.video), 420);
 }
 function touchEnd(): void {
   clearTimeout(pressTimer);

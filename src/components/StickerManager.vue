@@ -62,7 +62,7 @@ function commitRenameGroup(g: StickerGroup, e: Event): void {
 }
 
 function setGroupIcon(g: StickerGroup): void {
-  const v = prompt('分组图标：输入一个 emoji（留空恢复默认）', g.icon?.startsWith('<svg') ? '' : g.icon ?? '');
+  const v = prompt('分组图标：emoji、图片链接（https:// 或 data:image/…）或 <svg> 代码，留空恢复默认', g.icon ?? '');
   if (v === null) return;
   g.icon = v.trim() || undefined;
 }

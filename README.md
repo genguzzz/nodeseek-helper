@@ -1,59 +1,188 @@
-# NodeSeek 助手（油猴脚本）
+<div align="center">
 
-基于 [vite-plugin-monkey](https://github.com/lisonge/vite-plugin-monkey) + Vue 3 + TypeScript。
+# NodeSeek 助手
+
+为 [NodeSeek](https://www.nodeseek.com) 打造的增强脚本：**粘贴即传图床 · 表情包管理与快捷发送 · 多端配置同步**。
+界面直接复用论坛自身的样式变量，跟随日 / 夜间模式切换，看起来就像论坛原生功能。
+
+同一份代码同时产出 **油猴脚本** 与 **Surge / Quantumult X / Loon / Stash 模块**。
+
+[安装](#安装) · [功能](#功能) · [图床](#支持的图床) · [配置同步](#配置同步) · [自建同步服务](#自建同步服务) · [开发](#开发)
+
+</div>
+
+---
+
+## 安装
+
+到 [Releases](https://github.com/genguzzz/nodeseek-helper/releases/latest) 下载，或直接使用下面的链接（总是指向最新版本）。
+
+| 运行方式 | 安装 |
+|---|---|
+| **Tampermonkey / Violentmonkey**（推荐） | 安装 [`nodeseek-helper.user.js`](https://github.com/genguzzz/nodeseek-helper/releases/latest/download/nodeseek-helper.user.js)，脚本会自动检查更新 |
+| **Surge** | 模块 → 安装新模块：`https://github.com/genguzzz/nodeseek-helper/releases/latest/download/nodeseek-helper.sgmodule` |
+| **Quantumult X** | 重写 → 引用：`https://github.com/genguzzz/nodeseek-helper/releases/latest/download/nodeseek-helper.snippet` |
+| **Loon** | 插件：`https://github.com/genguzzz/nodeseek-helper/releases/latest/download/nodeseek-helper.plugin` |
+| **Stash** | 覆写：`https://github.com/genguzzz/nodeseek-helper/releases/latest/download/nodeseek-helper.stoverride` |
+
+> 代理版本需要开启 MITM 并信任证书，模块已声明 `nodeseek.com`、`deepflood.com` 两个域名。
+> 代理版本运行在手机浏览器等任意环境中，无需安装扩展；配置保存在站点的本地存储里，可用「配置同步」或「配置导入 / 导出」与油猴版互通。
+
+首次使用：打开任意帖子，点击右下角「回到顶部」上方的 **助手** 按钮 → 图床设置。
 
 ## 功能
-- **粘贴 / 拖拽图片自动上传**：回复、发帖编辑器（CodeMirror）里 Ctrl+V 截图或拖入图片，先插入占位，上传完成后替换为 Markdown；工具栏和编辑器右上角各有一个上传按钮。
-- **多图床配置**，可同时保存多个并一键切换，带「测试上传」：
-  CloudFlare-ImgBed（MarSeventh）、兰空 Lsky Pro v1/v2、EasyImage 2.0、Chevereto、NodeImage、SM.MS、Imgur、PicList/PicGo 本地服务、**自定义**（URL / 方法 / 请求头 / 表单字段 / binary 请求体 / 返回值 JSON 路径 / URL 前缀）。
-- 可选的上传前压缩（WebP/JPEG、质量、最大宽度）和插入模板（`{url}` `{name}`）。
-- **表情包**：Markdown 工具栏里的笑脸按钮弹出表情面板（工具栏隐藏时在编辑器右上角），分组、收藏、最近、搜索；动图默认静止，悬浮播放并显示大图预览（移动端长按）；Shift+点击可连续插入。
-- **表情管理**：分组（新建 / 重命名 / 图标 / 拖动排序）、拖动卡片排序、拖到分组即可移动、按使用次数 / 最近 / 添加时间 / 名称排序并可保存为自定义顺序、批量收藏 / 移动 / 删除、批量导入（链接 / Markdown / HTML / 整段帖子 / 本地图片经图床上传 / JSON 备份）、导出备份。
-- 内置「花火」表情分组（来源 https://www.nodeseek.com/post-472759-1）。
-- 帖子内悬浮图片可一键「收藏为表情」；上传记录可复制链接或设为表情。
-- 入口：右下角快捷按钮组（回到顶部上方）的「助手」按钮（表情包管理 / 图床 / 上传记录 / 通用），顶部导航花火图标、编辑器右上角齿轮、油猴菜单。
-- CloudFlare-ImgBed「读取站点配置」：自动读取 `/api/userConfig`、`/api/channels`、`/api/auth/sessionCheck`，填好渠道、目录、命名方式、链接前缀，并提示是否需要认证码。
-- **配置导入 / 导出**（通用页）：完整配置、`{"hosts":[...]}` 或单个图床对象均可导入，用于在油猴版与代理版之间迁移。
-- UI 直接使用站点 CSS 变量（`--main-color`、`--bg-main-color` 等），跟随 `body.dark-layout` 日/夜切换。
 
-## 产物（同一份代码，多种运行方式）
-`npm run build` 一次生成：
+### 图片上传
+- 在回复 / 发帖编辑器里 **粘贴截图或图片**、**拖入图片文件**，自动上传并插入 Markdown；上传中先插入占位，完成后替换。
+- 工具栏与编辑器右上角提供上传按钮（可在「通用 → 界面入口」关闭）。
+- 可选上传前压缩：WebP / JPEG、质量、最大宽度。
+- 上传记录：复制链接 / Markdown，一键设为表情。
 
-| 文件 | 用途 |
+### 表情包
+- Markdown 工具栏的 **笑脸按钮** 弹出表情面板：收藏、最近使用、自定义分组、搜索。
+- 动图默认静止，**鼠标悬浮播放并显示大图预览**；移动端长按预览；Shift + 点击可连续插入。
+- 内置「花火」表情分组（来源 [NodeSeek 帖子](https://www.nodeseek.com/post-472759-1)）。
+- 管理面板：分组新建 / 重命名 / 拖动排序 / 自定义图标（emoji、图片链接、SVG）、卡片拖动排序、拖到分组即移动、按使用次数 / 最近 / 名称排序、批量收藏 / 移动 / 删除、导出备份。
+- 批量导入：粘贴链接、Markdown、HTML 或整段帖子（自动提取图片）、本地图片（经图床上传）、JSON 备份。
+- 帖子中悬浮图片可 **一键收藏为表情**。
+
+### 不消耗别人的图床流量
+收藏或导入表情时：
+
+| 图片来源 | 处理 |
 |---|---|
-| `nodeseek-helper.user.js` | Tampermonkey / Violentmonkey 用户脚本 |
-| `nodeseek-helper.inject.js` | 代理注入版（Vue 与样式已内置，GM API 换成 localStorage + 同源中转） |
-| `nsh-proxy.js` | 代理通用脚本：改写 HTML 注入、提供 `/__nsh/app.js`、`/__nsh/relay` 上传中转 |
-| `nodeseek-helper.sgmodule` | Surge 模块 |
-| `nodeseek-helper.snippet` | Quantumult X 重写片段 |
-| `nodeseek-helper.plugin` | Loon 插件 |
-| `nodeseek-helper.stoverride` | Stash 覆写 |
+| NodeSeek 官方图床（NodeImage）、论坛自身资源 | 直接收藏 |
+| 你自己配置的图床 | 直接收藏 |
+| 其他图床 | 提示后下载并 **转存到你的图床**；没有配置图床时引导转存到官方图床 NodeImage |
 
-代理版需要 MITM `nodeseek.com` / `deepflood.com`。发布前设置 dist 的公开地址再构建：
+转存时体积偏大（> 200KB 或边长 > 360px）的表情会自动压缩：静态图转 WebP；GIF 逐帧缩放后重新编码，**保留动画与透明**。
+
+### 界面
+- 所有颜色取自论坛的 CSS 变量（`--main-color`、`--bg-main-color`…），日 / 夜间自动切换。
+- 入口：右下角「助手」按钮、导航栏图标、编辑器右上角齿轮、油猴菜单，均可单独关闭。
+
+## 支持的图床
+
+| 图床 | 说明 |
+|---|---|
+| [CloudFlare-ImgBed](https://github.com/MarSeventh/CloudFlare-ImgBed)（Sanyue ImgHub） | 推荐。认证码或 API Token；渠道、目录、命名方式、自定义链接前缀；**「读取站点配置」一键填写** |
+| [兰空图床 Lsky Pro](https://github.com/lsky-org/lsky-pro) | v1 / v2，储存策略、相册、权限 |
+| [EasyImage 2.0](https://github.com/icret/EasyImages2.0) | Token |
+| [Chevereto](https://chevereto.com) | V3 / V4 API Key，相册 |
+| [NodeImage](https://www.nodeimage.com)（论坛官方图床） | API Key |
+| [SM.MS](https://sm.ms) | Token，可切换国内域名 |
+| [Imgur](https://imgur.com) | Client ID |
+| [PicList / PicGo](https://piclist.cn) | 转发到本机 PicList，间接支持它的全部图床 |
+| **自定义** | 请求地址、方法、请求头、表单字段、binary 请求体、返回值 JSON 路径、URL 前缀，适配任意 API |
+
+可同时保存多套配置并随时切换，每套都能「测试上传」。
+
+## 配置同步
+
+在多台设备、油猴版与代理版之间同步 **图床配置、通用设置、全部表情包（含自定义分组与图标）**。
+
+| 后端 | 适合 | 准备 |
+|---|---|---|
+| **自建同步服务** | 想要实时同步、数据完全自管 | 部署本项目的 Go 服务（见下节），填服务地址 + 令牌 |
+| **WebDAV** | 坚果云、Nextcloud、群晖、Alist、InfiniCLOUD… | 目录地址 + 账号 + 密码（坚果云用「第三方应用密码」） |
+| **GitHub Gist** | 有 GitHub 账号 | 只含 `gist` 权限的令牌；Gist ID 留空会自动创建私密 Gist |
+| **OneDrive** | 微软账号 | 在 Microsoft Entra 注册应用（见下） |
+
+- **端到端加密**：设置同步口令后，数据在本机用 AES-256-GCM 加密再上传，任何后端只看到密文；口令只保存在本机。
+- **按条目合并**：多端同时修改不同的表情 / 分组 / 图床都会保留；同一条目以最后修改为准；使用次数取最大值；删除以墓碑记录。
+- **自动同步**：修改后 3 秒推送；页面回到前台时拉取；可设定时拉取；自建服务通过长轮询实时推送。
+- 数据格式与协议见 [docs/sync.md](docs/sync.md)。
+
+<details>
+<summary>OneDrive 应用注册步骤</summary>
+
+1. 打开 [Microsoft Entra 应用注册](https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade) → 新注册。
+2. 受支持的账户类型选择「任何组织目录中的帐户和个人 Microsoft 帐户」，重定向 URI 留空。
+3. 「身份验证」→ 高级设置 → **允许公共客户端流** 设为「是」。
+4. 「API 权限」→ 添加 Microsoft Graph 委托权限 `Files.ReadWrite.AppFolder`、`offline_access`。
+5. 复制「应用程序(客户端) ID」填入脚本，点「登录 OneDrive」，在打开的微软页面输入显示的代码（已自动复制）。
+
+数据保存在 OneDrive 的「应用 / nodeseek-helper」专属文件夹中，脚本无权访问其他文件。
+</details>
+
+## 自建同步服务
+
+`server/` 是一个只依赖 Go 标准库的单文件服务：**常驻内存 < 10MB**（CI 中有内存检查），数据以文件形式落盘，只保存加密后的信封，不解析内容。
+
+### Docker
+
 ```bash
-NSH_PUBLISH_BASE=https://cdn.jsdelivr.net/gh/<github-user>/nodeseek-helper@main/dist npm run build
+docker run -d --name nsh-sync --restart unless-stopped \
+  -p 8787:8787 -v nsh-sync-data:/data \
+  -e NSH_TOKENS=换成一个足够长的随机令牌 \
+  ghcr.io/genguzzz/nodeseek-helper-sync:latest
 ```
-代理环境没有跨域能力，图床请求经同源 `/__nsh/relay` 交给代理脚本转发；代理版的配置存在站点 localStorage，与油猴版互不相通，用「配置导入 / 导出」迁移。
+
+### 二进制
+
+从 [Releases](https://github.com/genguzzz/nodeseek-helper/releases/latest) 下载对应平台（Linux amd64 / arm64 / armv7、macOS、Windows、FreeBSD）：
+
+```bash
+NSH_TOKENS=换成一个足够长的随机令牌 NSH_DATA=./data ./nsh-sync-server
+```
+
+### 配置
+
+| 环境变量 | 默认 | 说明 |
+|---|---|---|
+| `NSH_TOKENS` | — | 允许的令牌，逗号分隔；每个令牌是一个独立空间（可分给朋友） |
+| `NSH_OPEN` | — | 设为 `1` 时接受任意长度 ≥ 16 的令牌（开放注册） |
+| `NSH_ADDR` | `:8787` | 监听地址 |
+| `NSH_DATA` | `./data` | 数据目录 |
+| `NSH_MAX_BODY` | `2097152` | 单个空间数据上限（字节） |
+| `NSH_MAX_SPACES` | `1000` | 空间数量上限 |
+| `NSH_MAX_WATCHERS` | `256` | 长轮询连接上限 |
+| `NSH_LOG` | — | 设为 `quiet` 关闭请求日志 |
+
+建议放在 HTTPS 反向代理之后（Caddy / Nginx）。令牌以 SHA-256 摘要作为空间 ID，服务端不保存明文令牌。
+
+### 设计要点
+- 乐观并发：`ETag` + `If-Match`，冲突返回 412，由客户端重新合并后推送。
+- 写入流式落盘（边写边算 SHA-256，临时文件 + 原子重命名），读取直接流式返回，数据不驻留内存。
+- `GET /v1/sync/watch` 长轮询：数据变化即刻唤醒等待中的设备，实现实时同步。
+- 内存上限默认 8MiB（`GOMEMLIMIT`），按空间限流。
 
 ## 开发
+
 ```bash
 npm install
-npm run dev     # 浏览器打开 http://127.0.0.1:5173/__vite-plugin-monkey.install.user.js 安装一次，之后改代码页面自动热更新
-npm run build   # 产物 dist/nodeseek-helper.user.js
+npm run dev          # 浏览器打开 http://127.0.0.1:5173/__vite-plugin-monkey.install.user.js 安装一次，之后保存即热更新
+npm run build        # 产出 dist/：油猴脚本 + 代理注入版 + 各代理工具模块
+npm test             # 同步合并 / 加密单测
 npm run typecheck
 ```
-本地无登录态调试：`node dev/mock-server.mjs` 后打开：
-- http://localhost:5299/dev/mock.html：油猴版（GM API 用 localStorage 模拟）
-- http://localhost:5299/dev/proxied.html：代理版，页面与 `/__nsh/*` 都经真实的 `dist/nsh-proxy.js` 处理（`dev/proxy-sim.mjs` 模拟 Surge 的 `$httpClient`；`NSH_SIM=qx` 切换为 Quantumult X 的 `$task`）。构建时设 `NSH_PUBLISH_BASE=http://localhost:5299/dist`。
 
-模拟 ImgBed 的 `/upload` 认证码为 `test-code`。个人图床配置放在 `presets/`（已 gitignore），在「通用 → 配置导入」中导入。
+- 基于 [vite-plugin-monkey](https://github.com/lisonge/vite-plugin-monkey) + Vue 3 + TypeScript。
+- 开发模式下，油猴里安装的只是加载器，代码从本地开发服务器动态加载，修改后页面自动刷新，无需重新安装。
+- 代理版构建（`vite.inject.config.ts`）把 `$`（GM API）替换为 `src/platform/web.ts`：存储用 localStorage，跨域请求经同源 `/__nsh/relay` 交给代理脚本转发。
+- 本地无登录态调试：`node dev/mock-server.mjs` 后打开
+  - `http://localhost:5299/dev/mock.html`：模拟编辑器 + 模拟 ImgBed（认证码 `test-code`）
+  - `http://localhost:5299/dev/proxied.html`：页面与 `/__nsh/*` 经真实的 `dist/nsh-proxy.js` 处理（`dev/proxy-sim.mjs` 模拟 Surge；`NSH_SIM=qx` 模拟 Quantumult X）。构建时设 `NSH_PUBLISH_BASE=http://localhost:5299/dist`。
+- 个人图床配置可放在 `presets/*.json`（已 gitignore），在「通用 → 配置导入」中导入；其中的域名会在本地构建时写入 `@connect`，Tampermonkey 不再弹跨域确认。
+- 自建服务：`cd server && go test ./... && bash scripts/memcheck.sh`。
 
-## 目录
-- `src/core/uploaders.ts`：图床定义（字段 schema + 请求构造 + 响应解析），新增图床只需追加一项
-- `src/core/editor.ts`：编辑器注入（粘贴、拖拽、工具栏上传 / 表情按钮）
-- `src/core/fastnav.ts`：右下角快捷按钮
-- `src/platform/web.ts`：代理版的 GM API 适配（`$` 在注入构建中指向它）
-- `proxy/nsh-proxy.js`、`scripts/build-proxy.mjs`：代理脚本模板与模块生成
-- `src/core/store.ts`：GM 存储（多标签页同步）、表情数据操作
-- `src/core/packs.ts`：内置表情包与花火图标
-- `src/components/`：选择面板、管理面板、图床设置等
+### 目录
+
+```
+src/
+  core/        编辑器注入、上传、图床定义、表情、收藏策略、压缩、存储
+  sync/        同步：文档格式与合并、加密信封、各后端、自动同步引擎
+  components/  面板与弹层（Vue）
+  platform/    代理版的 GM API 适配
+proxy/         代理通用脚本模板
+server/        Go 自建同步服务
+docs/          同步协议
+```
+
+### 发布
+
+推送 `v*` 标签后，GitHub Actions 会构建全部产物（设置 `NSH_PUBLISH_BASE` 为 Release 下载地址）、多平台服务端二进制与多架构 Docker 镜像（`ghcr.io/genguzzz/nodeseek-helper-sync`），并创建 Release。
+
+## 许可
+
+[MIT](LICENSE)

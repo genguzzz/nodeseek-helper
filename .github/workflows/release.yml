@@ -1,0 +1,82 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+  packages: write
+
+env:
+  PUBLISH_BASE: https://github.com/${{ github.repository }}/releases/latest/download
+  IMAGE: ghcr.io/${{ github.repository_owner }}/nodeseek-helper-sync
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck && npx vitest run
+      - name: 构建油猴脚本与代理模块
+        run: NSH_PUBLISH_BASE=$PUBLISH_BASE npm run build
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+      - name: 构建同步服务二进制
+        working-directory: server
+        run: |
+          set -e
+          VERSION=${GITHUB_REF_NAME#v}
+          mkdir -p ../release
+          for target in linux/amd64 linux/arm64 linux/arm/7 darwin/amd64 darwin/arm64 windows/amd64 freebsd/amd64; do
+            IFS=/ read -r os arch arm <<< "$target"
+            name=nsh-sync-server_${VERSION}_${os}_${arch}${arm:+v$arm}
+            ext=""; [ "$os" = windows ] && ext=.exe
+            CGO_ENABLED=0 GOOS=$os GOARCH=$arch GOARM=$arm \
+              go build -trimpath -ldflags "-s -w -X main.version=$VERSION" -o "dist/$name/nsh-sync-server$ext" .
+            cp ../LICENSE "dist/$name/"
+            if [ "$os" = windows ]; then (cd dist && zip -qr "../../release/$name.zip" "$name"); else tar -C dist -czf "../release/$name.tar.gz" "$name"; fi
+          done
+
+      - name: 汇总产物
+        run: |
+          cp dist/nodeseek-helper.user.js dist/nodeseek-helper.inject.js dist/nsh-proxy.js \
+             dist/nodeseek-helper.sgmodule dist/nodeseek-helper.snippet dist/nodeseek-helper.plugin dist/nodeseek-helper.stoverride release/
+          cd release && sha256sum * > SHA256SUMS.txt
+
+      - name: 发布 Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" release/* \
+            --title "$GITHUB_REF_NAME" --generate-notes --verify-tag
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: 构建并推送多架构镜像
+        uses: docker/build-push-action@v6
+        with:
+          context: server
+          platforms: linux/amd64,linux/arm64,linux/arm/v7
+          push: true
+          build-args: VERSION=${{ github.ref_name }}
+          tags: |
+            ${{ env.IMAGE }}:${{ github.ref_name }}
+            ${{ env.IMAGE }}:latest

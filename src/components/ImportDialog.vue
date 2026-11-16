@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue';
 import { activeHost, addStickers, importBackup, parseImportText, stickerData, uid } from '../core/store';
 import { maybeCompress, uploadFile } from '../core/uploaders';
+import { classifyLink, rehostImage } from '../core/collect';
 import { settings } from '../core/store';
 import { toast } from '../core/ui';
 import StickerThumb from './StickerThumb.vue';
@@ -22,6 +23,9 @@ const progress = ref({ done: 0, failed: 0 });
 const dragging = ref(false);
 
 const parsed = computed(() => parseImportText(text.value));
+/** 非官方、非自有图床的链接：默认转存到自己的图床，避免长期消耗别人的流量 */
+const foreign = computed(() => parsed.value.filter((p) => classifyLink(p.url) === 'foreign'));
+const rehost = ref(true);
 const duplicates = computed(() => {
   const exists = new Set(stickerData.stickers.map((s) => s.url));
   return parsed.value.filter((p) => exists.has(p.url)).length;
@@ -35,13 +39,36 @@ function resolveGroup(): string {
   return id;
 }
 
-function importText(): void {
+async function importText(): Promise<void> {
   if (!parsed.value.length) return;
   const gid = resolveGroup();
-  const r = addStickers(parsed.value, gid);
-  toast(`导入 ${r.added} 个${r.skipped ? `，跳过重复 ${r.skipped} 个` : ''}`, 'success', 3500);
+  const host = activeHost();
+  const foreignSet = new Set(foreign.value.map((p) => p.url));
+  const direct = parsed.value.filter((p) => !foreignSet.has(p.url));
+  const r = addStickers(direct, gid);
+  let moved = 0;
+  if (foreign.value.length && rehost.value && host) {
+    uploading.value = true;
+    progress.value = { done: 0, failed: 0 };
+    for (const p of foreign.value) {
+      try {
+        const url = await rehostImage(p.url, host, p.name || p.url.split('/').pop() || 'sticker');
+        moved += addStickers([{ url, name: p.name }], gid).added;
+        progress.value.done++;
+      } catch {
+        progress.value.failed++;
+      }
+    }
+    uploading.value = false;
+  }
+  const skippedForeign = foreign.value.length && !(rehost.value && host) ? foreign.value.length : 0;
+  toast(
+    `导入 ${r.added + moved} 个${moved ? `（其中转存 ${moved} 个）` : ''}${r.skipped ? `，跳过重复 ${r.skipped} 个` : ''}${skippedForeign ? `，未导入非官方图床链接 ${skippedForeign} 个` : ''}`,
+    'success',
+    4500,
+  );
   emit('done', gid);
-  emit('close');
+  if (!progress.value.failed) emit('close');
 }
 
 function onPickFiles(list: FileList | null | undefined): void {
@@ -128,6 +155,17 @@ async function onBackupFile(list: FileList | null): Promise<void> {
             识别到 <b>{{ parsed.length }}</b> 张
             <template v-if="duplicates">，其中 {{ duplicates }} 张已存在将跳过</template>
           </div>
+          <div v-if="foreign.length" class="nsh-import-warn">
+            <template v-if="activeHost()">
+              <label class="nsh-check"><input v-model="rehost" type="checkbox" />
+                {{ foreign.length }} 张不在官方图床，转存到我的图床「{{ activeHost()?.name }}」（偏大的自动压缩）</label>
+              <div v-if="!rehost" class="nsh-help">不转存的话这些链接不会导入，避免长期消耗别人图床的流量</div>
+            </template>
+            <template v-else>
+              {{ foreign.length }} 张不在官方图床，为避免消耗别人图床的流量不会导入；配置图床后可自动转存。
+            </template>
+          </div>
+          <div v-if="uploading" class="nsh-import-summary">转存中 {{ progress.done + progress.failed }} / {{ foreign.length }}…</div>
           <div v-if="parsed.length" class="nsh-import-preview">
             <StickerThumb v-for="p in parsed.slice(0, PREVIEW_LIMIT)" :key="p.url" :url="p.url" :name="p.name" :size="52" />
             <span v-if="parsed.length > PREVIEW_LIMIT" class="nsh-sub">… 还有 {{ parsed.length - PREVIEW_LIMIT }} 张</span>
@@ -164,7 +202,7 @@ async function onBackupFile(list: FileList | null): Promise<void> {
 
       <div v-if="mode !== 'backup'" class="nsh-dialog-foot">
         <button class="nsh-btn" :disabled="uploading" @click="emit('close')">取消</button>
-        <button v-if="mode === 'text'" class="nsh-btn primary" :disabled="!parsed.length" @click="importText">
+        <button v-if="mode === 'text'" class="nsh-btn primary" :disabled="!parsed.length || uploading" @click="importText">
           导入 {{ Math.max(0, parsed.length - duplicates) }} 张
         </button>
         <button v-else class="nsh-btn primary" :disabled="!files.length || uploading" @click="uploadFiles">
@@ -270,6 +308,14 @@ async function onBackupFile(list: FileList | null): Promise<void> {
   max-height: 200px;
   overflow-y: auto;
   align-items: center;
+}
+.nsh-import-warn {
+  margin: 0 0 8px;
+  padding: 8px 10px;
+  border-radius: var(--nsh-radius);
+  background: rgba(245, 166, 35, 0.12);
+  font-size: 12px;
+  color: var(--nsh-text);
 }
 .nsh-dropzone {
   display: flex;

@@ -51,11 +51,12 @@ function http(opts) {
     } else if (opts.body != null) {
       req.body = opts.body;
     }
-    return $task.fetch(req).then((r) => ({ status: r.statusCode, headers: r.headers || {}, body: r.body }));
+    return $task.fetch(req).then((r) => ({ status: r.statusCode, headers: r.headers || {}, body: opts.binary ? r.bodyBytes : r.body }));
   }
   return new Promise((resolve, reject) => {
     const fn = $httpClient[(opts.method || 'GET').toLowerCase()] || $httpClient.post;
     const req = { url: opts.url, headers: opts.headers, timeout: 120 };
+    if (opts.binary) req['binary-mode'] = true;
     if (opts.body != null) req.body = opts.body;
     fn.call($httpClient, req, (err, resp, data) => {
       if (err) return reject(err);
@@ -67,7 +68,11 @@ function http(opts) {
 /** 直接返回一个响应（不再请求源站） */
 function respond(status, headers, body) {
   if (isQX) {
-    $done({ status: `HTTP/1.1 ${status} ${status < 400 ? 'OK' : 'Error'}`, headers, body });
+    const isBytes = body instanceof ArrayBuffer || ArrayBuffer.isView(body);
+    const payload = { status: `HTTP/1.1 ${status} ${status < 400 ? 'OK' : 'Error'}`, headers };
+    if (isBytes) payload.bodyBytes = ArrayBuffer.isView(body) ? body.buffer.slice(body.byteOffset, body.byteOffset + body.byteLength) : body;
+    else payload.body = body;
+    $done(payload);
   } else {
     $done({ response: { status, headers, body } });
   }
@@ -82,13 +87,21 @@ async function relay() {
   const target = decodeURIComponent(headerOf($request.headers, 'X-NSH-Url') || '');
   if (!/^https?:\/\//.test(target)) return respond(400, { 'Content-Type': 'application/json', 'X-NSH-Relay': '1' }, '{"message":"缺少目标地址"}');
   const method = headerOf($request.headers, 'X-NSH-Method') || 'POST';
+  const binary = headerOf($request.headers, 'X-NSH-Binary') === '1';
   const extra = JSON.parse(b64decode(headerOf($request.headers, 'X-NSH-Headers') || 'e30=') || '{}');
   const headers = Object.assign({}, extra);
   const ct = headerOf($request.headers, 'Content-Type');
   if (ct && !headerOf(headers, 'Content-Type')) headers['Content-Type'] = ct;
   try {
-    const res = await http({ url: target, method, headers, body: requestBody() });
-    respond(res.status, { 'Content-Type': headerOf(res.headers, 'Content-Type') || 'application/json', 'X-NSH-Relay': '1', 'Cache-Control': 'no-store' }, res.body);
+    const body = method === 'GET' || method === 'HEAD' ? undefined : requestBody();
+    const res = await http({ url: target, method, headers, body, binary });
+    const out = { 'Content-Type': headerOf(res.headers, 'Content-Type') || 'application/json', 'X-NSH-Relay': '1', 'Cache-Control': 'no-store' };
+    // 同步协议依赖的版本头原样透传
+    for (const h of ['ETag', 'X-Updated-At', 'Last-Modified']) {
+      const v = headerOf(res.headers, h);
+      if (v) out[h] = v;
+    }
+    respond(res.status, out, res.body);
   } catch (e) {
     respond(502, { 'Content-Type': 'application/json', 'X-NSH-Relay': '1' }, JSON.stringify({ message: '中转失败：' + String(e) }));
   }

@@ -5,6 +5,7 @@ const BTN_GAP = 40;
 const MENU: { tab: PanelTab; label: string }[] = [
   { tab: 'stickers', label: '表情包管理' },
   { tab: 'hosts', label: '图床设置' },
+  { tab: 'sync', label: '配置同步' },
   { tab: 'history', label: '上传记录' },
   { tab: 'general', label: '通用设置' },
 ];

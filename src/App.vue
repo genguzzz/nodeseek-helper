@@ -5,20 +5,23 @@ import HostSettings from './components/HostSettings.vue';
 import StickerManager from './components/StickerManager.vue';
 import GeneralSettings from './components/GeneralSettings.vue';
 import UploadHistory from './components/UploadHistory.vue';
+import SyncSettings from './components/SyncSettings.vue';
 import PreviewPopover from './components/PreviewPopover.vue';
 import PickerPopover from './components/PickerPopover.vue';
+import ConfirmDialog from './components/ConfirmDialog.vue';
 import { HANABI_ICON } from './core/packs';
 
 const tabs: { id: PanelTab; label: string; icon: string }[] = [
   { id: 'hosts', label: '图床', icon: '☁' },
   { id: 'stickers', label: '表情包', icon: '☺' },
+  { id: 'sync', label: '同步', icon: '⇅' },
   { id: 'general', label: '通用', icon: '⚙' },
   { id: 'history', label: '上传记录', icon: '⏱' },
 ];
 
 /** 打开设置面板时锁定页面滚动，并补上滚动条宽度防止页面横跳 */
 watch(
-  () => ui.panelOpen,
+  () => ui.panelOpen || !!ui.confirm,
   (open) => {
     const html = document.documentElement;
     if (open) {
@@ -38,7 +41,9 @@ function blockScroll(e: Event): void {
 }
 
 function onKey(e: KeyboardEvent): void {
-  if (e.key === 'Escape' && ui.panelOpen) ui.panelOpen = false;
+  if (e.key !== 'Escape') return;
+  if (ui.confirm) ui.confirm.resolve('cancel');
+  else if (ui.panelOpen) ui.panelOpen = false;
 }
 onMounted(() => document.addEventListener('keydown', onKey));
 onBeforeUnmount(() => document.removeEventListener('keydown', onKey));
@@ -61,6 +66,7 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKey));
           <KeepAlive>
             <HostSettings v-if="ui.panelTab === 'hosts'" />
             <StickerManager v-else-if="ui.panelTab === 'stickers'" />
+            <SyncSettings v-else-if="ui.panelTab === 'sync'" />
             <GeneralSettings v-else-if="ui.panelTab === 'general'" />
             <UploadHistory v-else />
           </KeepAlive>
@@ -83,6 +89,7 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKey));
     </TransitionGroup>
   </div>
 
+  <ConfirmDialog />
   <PickerPopover />
   <PreviewPopover />
 </template>

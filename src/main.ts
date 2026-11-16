@@ -1,11 +1,14 @@
-import { createApp } from 'vue';
+import { createApp, watchEffect } from 'vue';
 import { GM_registerMenuCommand } from '$';
 import './styles.css';
 import App from './App.vue';
 import { watchEditors } from './core/editor';
 import { injectFastNav } from './core/fastnav';
-import { addStickers, DEFAULT_GROUP_ID, settings } from './core/store';
-import { openPanel, toast } from './core/ui';
+import { settings } from './core/store';
+import { collectSticker } from './core/collect';
+import { startAutoSync } from './sync/engine';
+import { loadOfficialStickers } from './core/official';
+import { openPanel } from './core/ui';
 import { HANABI_ICON_MONO } from './core/packs';
 
 function mountApp(): void {
@@ -62,9 +65,21 @@ function setupCollect(): void {
   btn.addEventListener('click', () => {
     if (!current) return;
     const src = current.currentSrc || current.src;
-    const r = addStickers([{ url: src, name: current.alt && current.alt !== 'image' ? current.alt : undefined } as { url: string; name?: string }], DEFAULT_GROUP_ID);
-    toast(r.added ? '已收藏到「默认」分组' : '表情库里已经有它了', r.added ? 'success' : 'info');
     btn.style.display = 'none';
+    // 非官方图床的图片会询问是否转存，见 core/collect.ts
+    void collectSticker(src, current.alt).catch(() => undefined);
+  });
+}
+
+/** 界面入口开关：用 <html> 上的 class 控制显隐，切换即时生效 */
+function bindEntryToggles(): void {
+  watchEffect(() => {
+    const c = document.documentElement.classList;
+    c.toggle('nsh-hide-upload', !settings.showUploadButton);
+    c.toggle('nsh-hide-sticker', !settings.showStickerButton);
+    c.toggle('nsh-hide-fastnav', !settings.showFastNav);
+    c.toggle('nsh-hide-header', !settings.showHeaderEntry);
+    c.toggle('nsh-hide-native-exp', settings.hideNativeStickerBar);
   });
 }
 
@@ -73,13 +88,17 @@ function boot(): void {
   if (document.documentElement.dataset.nshLoaded) return;
   document.documentElement.dataset.nshLoaded = '1';
   mountApp();
+  bindEntryToggles();
   injectHeaderEntry();
   injectFastNav();
   watchEditors();
   setupCollect();
+  startAutoSync();
+  void loadOfficialStickers();
   GM_registerMenuCommand('⚙ 打开 NodeSeek 助手', () => openPanel());
   GM_registerMenuCommand('☁ 图床设置', () => openPanel('hosts'));
   GM_registerMenuCommand('☺ 表情包管理', () => openPanel('stickers'));
+  GM_registerMenuCommand('⇅ 配置同步', () => openPanel('sync'));
 }
 
 boot();

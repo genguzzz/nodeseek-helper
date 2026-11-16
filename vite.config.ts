@@ -3,6 +3,10 @@ import vue from '@vitejs/plugin-vue';
 import monkey, { cdn } from 'vite-plugin-monkey';
 import fs from 'node:fs';
 
+const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8')) as { version: string };
+/** 发布地址（dist 的公开 URL），设置后写入 @updateURL / @downloadURL，油猴可自动更新 */
+const publishBase = process.env.NSH_PUBLISH_BASE?.replace(/\/+$/, '');
+
 /**
  * 本地 presets/*.json（已 gitignore）里配置的图床域名，显式写进 @connect：
  * Tampermonkey 对声明过的域名直接放行，不再弹跨域确认；个人域名不进入公共代码。
@@ -14,7 +18,7 @@ function presetConnectHosts(): string[] {
   for (const f of fs.readdirSync(dir).filter((x) => x.endsWith('.json'))) {
     try {
       const json = JSON.parse(fs.readFileSync(`${dir}/${f}`, 'utf8'));
-      const list = json.hosts ?? json.settings?.hosts ?? [];
+      const list = [...(json.hosts ?? json.settings?.hosts ?? []), ...(json.sync ? [{ values: json.sync }] : [])];
       for (const h of list) {
         for (const v of Object.values(h.values ?? {})) {
           if (typeof v === 'string' && /^https?:\/\//.test(v)) hosts.add(new URL(v).hostname);
@@ -36,8 +40,17 @@ export default defineConfig({
       entry: 'src/main.ts',
       userscript: {
         name: 'NodeSeek 助手',
-        namespace: 'https://github.com/nodeseek-helper',
-        version: '0.1.0',
+        namespace: 'https://github.com/genguzzz/nodeseek-helper',
+        version: pkg.version,
+        ...(publishBase
+          ? {
+              updateURL: `${publishBase}/nodeseek-helper.user.js`,
+              downloadURL: `${publishBase}/nodeseek-helper.user.js`,
+            }
+          : {}),
+        homepageURL: 'https://github.com/genguzzz/nodeseek-helper',
+        supportURL: 'https://github.com/genguzzz/nodeseek-helper/issues',
+        license: 'MIT',
         description: 'NodeSeek 粘贴/拖拽图片自动上传图床（CloudFlare-ImgBed、兰空、EasyImage、Chevereto、SM.MS、Imgur、PicList、NodeImage、自定义），以及自定义表情包管理与快捷发送',
         icon: 'https://www.nodeseek.com/static/image/favicon/android-chrome-192x192.png',
         match: ['https://www.nodeseek.com/*', 'https://nodeseek.com/*', 'https://www.deepflood.com/*', 'https://deepflood.com/*'],

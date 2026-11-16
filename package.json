@@ -8,16 +8,26 @@
     "build": "vite build && vite build -c vite.inject.config.ts && node scripts/build-proxy.mjs",
     "build:userscript": "vite build",
     "build:proxy": "vite build -c vite.inject.config.ts && node scripts/build-proxy.mjs",
-    "typecheck": "vue-tsc --noEmit"
+    "typecheck": "vue-tsc --noEmit",
+    "test": "vitest run"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^6.0.11",
+    "jsdom": "^26.1.0",
     "typescript": "5.9",
     "vite": "^8.3.8",
     "vite-plugin-monkey": "^8.1.1",
+    "vitest": "^3.2.7",
     "vue-tsc": "^3.3.14"
   },
   "dependencies": {
+    "gifenc": "^1.0.3",
+    "gifuct-js": "^2.1.2",
     "vue": "3.5"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/genguzzz/nodeseek-helper.git"
   }
 }

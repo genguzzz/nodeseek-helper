@@ -24,6 +24,16 @@ export interface Settings {
   collectFromPost: boolean;
   /** 选择面板里动图默认静止，悬浮时播放 */
   freezeAnimated: boolean;
+  /** 界面入口开关 */
+  showUploadButton: boolean;
+  showStickerButton: boolean;
+  showFastNav: boolean;
+  showHeaderEntry: boolean;
+  /** 隐藏编辑器底部的原生表情栏（官方表情已并入工具栏表情面板） */
+  hideNativeStickerBar: boolean;
+  /** 官方表情的收藏（转义码列表）与使用记录 */
+  officialFav: string[];
+  officialUsage: Record<string, { c: number; t: number }>;
   hoverPreview: boolean;
   /** 已写入过的内置包，用户删除后不再自动恢复 */
   seededPacks: string[];
@@ -46,6 +56,10 @@ export interface Sticker {
   useCount: number;
   lastUsedAt: number;
   createdAt: number;
+  /** 官方表情的转义码，如 :yct001:（存在时发送转义码而非图片） */
+  code?: string;
+  /** 官方视频表情的 webm 地址（悬浮预览播放） */
+  video?: string;
 }
 
 export interface StickerGroup {
@@ -81,6 +95,13 @@ const defaultSettings = (): Settings => ({
   maxWidth: 0,
   collectFromPost: true,
   freezeAnimated: true,
+  showUploadButton: true,
+  showStickerButton: true,
+  showFastNav: true,
+  showHeaderEntry: true,
+  hideNativeStickerBar: true,
+  officialFav: [],
+  officialUsage: {},
   hoverPreview: true,
   seededPacks: [],
   history: [],
@@ -114,6 +135,10 @@ export function seedBuiltinPacks(force = false): void {
   }
 }
 
+let remoteDepth = 0;
+/** 当前是否正在应用其他标签页写入的数据（同步引擎据此忽略这类变更） */
+export const isApplyingRemote = (): boolean => remoteDepth > 0;
+
 /** 持久化 + 多标签页同步；remote 写入时跳过一次回写，避免死循环 */
 function persist<T extends object>(key: string, target: T): void {
   let applyingRemote = false;
@@ -130,7 +155,12 @@ function persist<T extends object>(key: string, target: T): void {
   GM_addValueChangeListener(key, (_name, _old, value, remote) => {
     if (!remote || !value) return;
     applyingRemote = true;
-    Object.assign(target, value);
+    remoteDepth++;
+    try {
+      Object.assign(target, value);
+    } finally {
+      remoteDepth--;
+    }
     queueMicrotask(() => (applyingRemote = false));
   });
 }

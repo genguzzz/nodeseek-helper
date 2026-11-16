@@ -66,7 +66,7 @@ Envelope（信封，后端只看到它）
 ### HostProfile
 
 ```jsonc
-{ "id": "akina", "name": "我的图床", "provider": "cfimgbed", "values": { "base": "https://…", "authCode": "…" } }
+{ "id": "h_k3f9a2", "name": "我的图床", "provider": "cfimgbed", "values": { "base": "https://…", "authCode": "…" } }
 ```
 
 ## 3. 合并规则（客户端）

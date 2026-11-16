@@ -65,6 +65,8 @@ export function GM_addStyle(css: string): HTMLStyleElement {
 interface XhrResponse {
   status: number;
   responseText: string;
+  response?: unknown;
+  responseHeaders?: string;
 }
 
 interface XhrDetails {
@@ -98,10 +100,12 @@ export function GM_xmlhttpRequest(d: XhrDetails): { abort: () => void } {
     xhr.setRequestHeader('X-NSH-Url', encodeURIComponent(d.url));
     xhr.setRequestHeader('X-NSH-Method', method);
     xhr.setRequestHeader('X-NSH-Headers', toBase64(JSON.stringify(d.headers ?? {})));
+    if (d.responseType === 'blob') xhr.setRequestHeader('X-NSH-Binary', '1');
   } else {
     for (const [k, v] of Object.entries(d.headers ?? {})) xhr.setRequestHeader(k, v);
   }
   xhr.timeout = d.timeout ?? 0;
+  if (d.responseType === 'blob') xhr.responseType = 'blob';
   if (d.upload?.onprogress) xhr.upload.onprogress = d.upload.onprogress;
   xhr.onload = () => {
     // 代理脚本未生效时同源 404 返回的是站点页面，给出明确提示
@@ -109,7 +113,8 @@ export function GM_xmlhttpRequest(d: XhrDetails): { abort: () => void } {
       d.onerror?.(new Error('中转不可用：请确认代理模块已启用且 MITM 包含 nodeseek.com'));
       return;
     }
-    d.onload?.({ status: xhr.status, responseText: xhr.responseText });
+    const isBlob = xhr.responseType === 'blob';
+    d.onload?.({ status: xhr.status, responseText: isBlob ? '' : xhr.responseText, response: xhr.response, responseHeaders: xhr.getAllResponseHeaders() });
   };
   xhr.onerror = (e) => d.onerror?.(e);
   xhr.ontimeout = (e) => d.ontimeout?.(e);
