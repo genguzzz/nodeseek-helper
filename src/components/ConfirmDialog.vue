@@ -22,6 +22,7 @@ import { ui } from '../core/ui';
 <style>
 .nsh-confirm-mask {
   z-index: 99998;
+  padding: 16px;
 }
 .nsh-confirm {
   width: 100%;

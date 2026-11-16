@@ -4,6 +4,7 @@ import { isApplyingRemote, settings, stickerData, uid } from '../core/store';
 import { open, PassphraseError, seal } from './crypto';
 import { applyDoc, buildLocalDoc, dedupeByUrl, docHash, mergeDocs, type SyncMeta } from './format';
 import { ConflictError, syncProviderById, type Values } from './providers';
+import { decodeSyncCode } from './sync-code';
 
 /** 本机同步配置：不参与同步（含后端凭据与加密口令） */
 export interface SyncConfig {
@@ -195,7 +196,8 @@ export function startAutoSync(): void {
 export function importSyncConfig(raw: unknown): boolean {
   const cfg = (raw as { sync?: Record<string, string> } | null)?.sync;
   if (!cfg || !syncProviderById(cfg.provider)) return false;
-  const { provider, passphrase, ...values } = cfg;
+  const { provider, passphrase, code, ...values } = cfg;
+  if (code) Object.assign(values, decodeSyncCode(code));
   syncConfig.values[provider] = { ...(syncConfig.values[provider] ?? {}), ...values };
   if (typeof passphrase === 'string') syncConfig.passphrase = passphrase;
   syncConfig.provider = provider;

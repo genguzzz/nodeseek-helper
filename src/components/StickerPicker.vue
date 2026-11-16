@@ -378,4 +378,27 @@ function runApp(key: string): void {
 .nsh-picker .nsh-empty a {
   color: var(--nsh-accent);
 }
+/* 触摸设备没有悬浮态：收藏星标常显（未收藏的淡一些） */
+@media (hover: none) {
+  .nsh-fav-dot {
+    opacity: 0.55;
+  }
+  .nsh-fav-dot.on {
+    opacity: 1;
+  }
+  .nsh-picker-cell:hover {
+    outline: none;
+  }
+}
+@media (max-width: 720px) {
+  .nsh-picker-search {
+    width: 92px;
+  }
+  .nsh-picker-bar {
+    padding: 0 6px;
+  }
+  .nsh-ptab {
+    padding: 0 7px;
+  }
+}
 </style>

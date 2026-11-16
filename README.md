@@ -45,7 +45,7 @@
 - 上传记录：复制链接 / Markdown，一键设为表情。
 
 ### 表情包
-- Markdown 工具栏的 **笑脸按钮** 弹出表情面板：收藏、最近使用、自定义分组、搜索。
+- Markdown 工具栏的 **笑脸按钮** 弹出表情面板（桌面跟随页面原生滚动；手机端为底部抽屉，可下拉关闭）：收藏、最近使用、自定义分组、搜索。
 - 动图默认静止，**鼠标悬浮播放并显示大图预览**；移动端长按预览；Shift + 点击可连续插入。
 - 内置「花火」表情分组（来源 [NodeSeek 帖子](https://www.nodeseek.com/post-472759-1)）。
 - 管理面板：分组新建 / 重命名 / 拖动排序 / 自定义图标（emoji、图片链接、SVG）、卡片拖动排序、拖到分组即移动、按使用次数 / 最近 / 名称排序、批量收藏 / 移动 / 删除、导出备份。
@@ -89,7 +89,7 @@
 
 | 后端 | 适合 | 准备 |
 |---|---|---|
-| **自建同步服务** | 想要实时同步、数据完全自管 | 部署本项目的 Go 服务（见下节），填服务地址 + 令牌 |
+| **自建同步服务** | 想要实时同步、数据完全自管 | 部署本项目的 Go 服务（见下节），粘贴服务端生成的**同步码**即可（也可切换为手动填写地址 + 令牌） |
 | **WebDAV** | 坚果云、Nextcloud、群晖、Alist、InfiniCLOUD… | 目录地址 + 账号 + 密码（坚果云用「第三方应用密码」） |
 | **GitHub Gist** | 有 GitHub 账号 | 只含 `gist` 权限的令牌；Gist ID 留空会自动创建私密 Gist |
 | **OneDrive** | 微软账号 | 在 Microsoft Entra 注册应用（见下） |
@@ -132,10 +132,24 @@ docker run -d --name nsh-sync --restart unless-stopped \
 NSH_TOKENS=换成一个足够长的随机令牌 NSH_DATA=./data ./nsh-sync-server
 ```
 
+### 同步码
+
+同步码把「对外访问地址 + 令牌」编码成一个 `nsh1_` 开头的字符串，客户端只需粘贴这一个值：
+
+```bash
+# 启动时设置对外访问地址，日志里会为每个令牌打印同步码
+NSH_PUBLIC_URL=https://sync.example.com NSH_TOKENS=换成一个足够长的随机令牌 ./nsh-sync-server
+# 或直接计算
+./nsh-sync-server code https://sync.example.com 换成一个足够长的随机令牌
+```
+
+同步码只是编码混淆而非加密，持有它即可访问对应空间，请像密码一样保管；数据本身仍由客户端的同步口令端到端加密。
+
 ### 配置
 
 | 环境变量 | 默认 | 说明 |
 |---|---|---|
+| `NSH_PUBLIC_URL` | — | 对外访问地址（如反代后的 HTTPS 地址），设置后启动日志打印同步码 |
 | `NSH_TOKENS` | — | 允许的令牌，逗号分隔；每个令牌是一个独立空间（可分给朋友） |
 | `NSH_OPEN` | — | 设为 `1` 时接受任意长度 ≥ 16 的令牌（开放注册） |
 | `NSH_ADDR` | `:8787` | 监听地址 |
@@ -188,7 +202,7 @@ docs/          同步协议
 
 ### 发布
 
-推送 `v*` 标签后，GitHub Actions 会构建全部产物（设置 `NSH_PUBLISH_BASE` 为 Release 下载地址）、多平台服务端二进制与多架构 Docker 镜像（`ghcr.io/genguzzz/nodeseek-helper-sync`），并创建 Release。
+推送 `v*` 标签后，GitHub Actions 会构建全部产物（发布构建对 `user.js` / `inject.js` 做 JS 混淆，保留油猴头部；本地 `npm run build` 默认不混淆，设 `NSH_OBFUSCATE=1` 开启）（设置 `NSH_PUBLISH_BASE` 为 Release 下载地址）、多平台服务端二进制与多架构 Docker 镜像（`ghcr.io/genguzzz/nodeseek-helper-sync`），并创建 Release。
 
 ## 许可
 

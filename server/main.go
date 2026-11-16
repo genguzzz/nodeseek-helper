@@ -37,6 +37,15 @@ func envInt(key string, def int64) int64 {
 }
 
 func main() {
+	// 子命令：nsh-sync-server code <对外访问地址> <令牌>，直接输出同步码
+	if len(os.Args) > 1 && os.Args[1] == "code" {
+		if len(os.Args) != 4 {
+			fmt.Fprintln(os.Stderr, "用法：nsh-sync-server code <对外访问地址> <令牌>\n例如：nsh-sync-server code https://sync.example.com my-long-token")
+			os.Exit(2)
+		}
+		fmt.Println(EncodeSyncCode(os.Args[2], os.Args[3]))
+		return
+	}
 	addr := flag.String("addr", env("NSH_ADDR", ":8787"), "监听地址")
 	dataDir := flag.String("data", env("NSH_DATA", "./data"), "数据目录")
 	maxBody := flag.Int64("max-body", envInt("NSH_MAX_BODY", 2<<20), "单个空间数据上限（字节）")
@@ -67,6 +76,12 @@ func main() {
 	if len(tokens) == 0 && !open {
 		fmt.Fprintln(os.Stderr, "请设置 NSH_TOKENS（逗号分隔的访问令牌），或设置 NSH_OPEN=1 开放注册")
 		os.Exit(2)
+	}
+	// 设置了对外访问地址时，启动时为每个令牌打印同步码，客户端粘贴即可完成配置
+	if pub := strings.TrimSpace(os.Getenv("NSH_PUBLIC_URL")); pub != "" {
+		for t := range tokens {
+			fmt.Fprintf(os.Stderr, "同步码（令牌 %s…）：%s\n", t[:min(4, len(t))], EncodeSyncCode(pub, t))
+		}
 	}
 	store, err := NewStore(*dataDir, int(*maxSpaces))
 	if err != nil {

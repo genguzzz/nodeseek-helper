@@ -524,5 +524,39 @@ async function test(): Promise<void> {
   .nsh-test-result {
     margin-left: 0;
   }
+  .nsh-host-list {
+    padding: 8px;
+    gap: 6px;
+  }
+  .nsh-host-item {
+    padding: 6px 10px;
+  }
+  .nsh-add-host {
+    margin-top: 0;
+    flex: none;
+  }
+  .nsh-host-main {
+    padding: 14px;
+  }
+  .nsh-provider-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .nsh-provider-card {
+    padding: 10px 12px;
+  }
+  .nsh-form-head {
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .nsh-name-input {
+    max-width: none;
+  }
+  .nsh-form-actions {
+    flex-wrap: wrap;
+  }
+  .nsh-form-actions .nsh-spacer {
+    display: none;
+  }
 }
 </style>

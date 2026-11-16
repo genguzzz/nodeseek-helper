@@ -47,14 +47,27 @@ function leave(): void {
   hidePreview();
 }
 
-/** 移动端长按预览 */
+/** 移动端长按预览：长按出预览后松手不触发点击；滑动列表时取消长按 */
 let pressTimer = 0;
+let pressed = false;
 function touchStart(): void {
-  pressTimer = window.setTimeout(() => root.value && showPreview(root.value, props.url, props.name, props.video), 420);
+  pressed = false;
+  pressTimer = window.setTimeout(() => {
+    if (!root.value) return;
+    pressed = true;
+    showPreview(root.value, props.url, props.name, props.video);
+  }, 420);
 }
-function touchEnd(): void {
+function touchMove(): void {
+  clearTimeout(pressTimer);
+}
+function touchEnd(e: TouchEvent): void {
   clearTimeout(pressTimer);
   hidePreview();
+  if (pressed) {
+    e.preventDefault();
+    pressed = false;
+  }
 }
 
 onBeforeUnmount(leave);
@@ -69,8 +82,10 @@ onBeforeUnmount(leave);
     @mouseenter="enter"
     @mouseleave="leave"
     @touchstart.passive="touchStart"
+    @touchmove.passive="touchMove"
     @touchend="touchEnd"
     @touchcancel="touchEnd"
+    @contextmenu.prevent
   >
     <img :src="url" :alt="name" loading="lazy" referrerpolicy="no-referrer" draggable="false" @load="onLoad" @error="failed = true" />
     <canvas v-show="frozen && !hovering" ref="canvas" />

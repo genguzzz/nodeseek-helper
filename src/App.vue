@@ -311,13 +311,48 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKey));
 @media (max-width: 720px) {
   .nsh-mask {
     padding: 0;
+    align-items: stretch;
   }
+  /* 手机：全屏面板，高度用动态视口（扣除浏览器工具栏），顶部 / 底部避开安全区 */
   .nsh-panel {
-    height: 100%;
+    max-width: none;
+    height: 100dvh;
     border-radius: 0;
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .nsh-panel-head {
+    gap: 4px;
+    padding: 0 4px 0 8px;
+    height: 46px;
   }
   .nsh-brand {
     display: none;
+  }
+  .nsh-tabs {
+    flex: 1;
+    min-width: 0;
+  }
+  .nsh-tab {
+    padding: 0 9px;
+    font-size: 13px;
+  }
+  .nsh-tab.active::after {
+    left: 9px;
+    right: 9px;
+  }
+  .nsh-tab-icon {
+    display: none;
+  }
+  .nsh-close {
+    flex: none;
+  }
+  .nsh-toasts {
+    top: calc(10px + env(safe-area-inset-top));
+    width: calc(100vw - 24px);
+  }
+  .nsh-toast {
+    max-width: 100%;
   }
 }
 </style>

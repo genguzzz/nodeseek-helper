@@ -348,4 +348,24 @@ async function onBackupFile(list: FileList | null): Promise<void> {
   padding: 10px 14px;
   border-top: 1px solid var(--nsh-border);
 }
+@media (max-width: 720px) {
+  .nsh-dialog-mask {
+    padding: 10px;
+  }
+  .nsh-dialog-head {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .nsh-seg {
+    order: 3;
+    width: 100%;
+  }
+  .nsh-seg button {
+    flex: 1;
+    padding: 0 6px;
+  }
+  .nsh-import-group {
+    flex-wrap: wrap;
+  }
+}
 </style>

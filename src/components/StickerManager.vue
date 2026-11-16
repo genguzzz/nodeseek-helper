@@ -640,6 +640,26 @@ const defaultImportGroup = computed(() => (currentGroup.value ? currentGroup.val
   .nsh-sm {
     flex-direction: column;
   }
+  .nsh-sm-toolbar,
+  .nsh-sm-bulk {
+    padding: 8px 10px;
+  }
+  .nsh-sm-search {
+    flex: 1;
+    min-width: 0;
+    width: auto;
+  }
+  .nsh-sm-grid {
+    padding: 10px;
+    gap: 8px;
+    grid-template-columns: repeat(auto-fill, minmax(86px, 1fr));
+  }
+  .nsh-sm-card {
+    padding: 8px 4px 6px;
+  }
+  .nsh-sm-status {
+    display: none;
+  }
   .nsh-sm-side {
     width: auto;
     flex-direction: row;

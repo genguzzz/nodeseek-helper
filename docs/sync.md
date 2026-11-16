@@ -113,6 +113,14 @@ Envelope（信封，后端只看到它）
 - CORS：允许任意来源，允许 `Authorization, Content-Type, If-Match, If-None-Match`，暴露 `ETag, X-Updated-At`。
 - 内存目标：常驻 < 10 MB。信封以流的方式写盘 / 读盘（不整体驻留内存），内存里只保留每个空间的元数据（etag、updatedAt、size）。
 
+### 同步码
+
+`nsh1_` + base64url( mask( utf8(对外地址) ‖ 0x00 ‖ utf8(令牌) ‖ 校验 2 字节 ) )
+
+- 校验：对 `地址 0x00 令牌` 计算 FNV-1a 32 位，取低 16 位（大端）。
+- mask：第 i 字节 `^ key[i % len(key)] ^ ((i*0x5b + 0x2d) & 0xff)`，key = `nodeseek-helper/sync-code/v1`。
+- 服务端 `server/synccode.go` 与客户端 `src/sync/sync-code.ts` 共用测试向量。编码混淆而非加密。
+
 ## 6. 其他后端的映射
 
 | 后端 | 存储位置 | 版本号 |

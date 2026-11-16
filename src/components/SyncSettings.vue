@@ -2,12 +2,44 @@
 import { computed, ref } from 'vue';
 import { GM_setClipboard } from '$';
 import { resetSyncCursor, syncConfig, syncNow, syncState } from '../sync/engine';
+import { decodeSyncCode } from '../sync/sync-code';
 import { onedrivePollLogin, onedriveStartLogin, syncProviderById, syncProviders, type DeviceCode } from '../sync/providers';
 import { toast } from '../core/ui';
 
 const reveal = ref<Record<string, boolean>>({});
 const provider = computed(() => syncProviderById(syncConfig.provider));
 const values = computed(() => (provider.value ? (syncConfig.values[provider.value.id] ??= {}) : {}));
+
+/* ---------- 自建服务：同步码（默认）/ 手动填写地址与令牌（回退） ---------- */
+const manual = ref(false);
+const setTimeout = (fn: () => void, ms: number): number => window.setTimeout(fn, ms);
+const codeInput = ref('');
+const codeError = ref('');
+const useCode = computed(() => provider.value?.id === 'selfhost' && !manual.value);
+const configuredHost = computed(() => {
+  try {
+    return values.value.base ? new URL(values.value.base).host : '';
+  } catch {
+    return values.value.base;
+  }
+});
+
+function applyCode(): void {
+  codeError.value = '';
+  const raw = codeInput.value.trim();
+  if (!raw) return;
+  try {
+    const { base, token } = decodeSyncCode(raw);
+    values.value.base = base;
+    values.value.token = token;
+    codeInput.value = '';
+    resetSyncCursor();
+    toast('同步码已识别，正在同步', 'success');
+    void syncNow('manual');
+  } catch (e) {
+    codeError.value = (e as Error).message;
+  }
+}
 const lastSync = computed(() => (syncConfig.lastSyncAt ? new Date(syncConfig.lastSyncAt).toLocaleString() : '从未'));
 
 function choose(id: string): void {
@@ -81,7 +113,27 @@ function disable(): void {
 
     <template v-if="provider">
       <div class="nsh-sync-form">
-        <div v-for="f in provider.fields" :key="f.key" class="nsh-field">
+        <!-- 自建服务默认只需粘贴同步码；「手动填写」回退到地址 + 令牌 -->
+        <div v-if="useCode" class="nsh-field">
+          <label class="nsh-label">同步码<em>*</em></label>
+          <div class="nsh-control">
+            <input
+              v-model="codeInput"
+              class="nsh-input"
+              placeholder="粘贴服务端生成的同步码（nsh1_ 开头）"
+              autocomplete="off"
+              spellcheck="false"
+              @change="applyCode"
+              @paste="setTimeout(applyCode, 0)"
+              @keydown.enter="applyCode"
+            />
+            <div v-if="codeError" class="nsh-help nsh-code-error">{{ codeError }}</div>
+            <div v-else-if="configuredHost" class="nsh-help">已配置：{{ configuredHost }}，粘贴新的同步码可替换</div>
+            <div v-else class="nsh-help">服务端设置 NSH_PUBLIC_URL 后启动日志会打印同步码，或运行 nsh-sync-server code &lt;地址&gt; &lt;令牌&gt;</div>
+            <a href="javascript:void(0)" class="nsh-link nsh-mode-switch" @click="manual = true">手动填写地址和令牌</a>
+          </div>
+        </div>
+        <div v-for="f in useCode ? [] : provider.fields" :key="f.key" class="nsh-field">
           <label class="nsh-label">{{ f.label }}<em v-if="f.required">*</em></label>
           <div class="nsh-control">
             <div class="nsh-input-wrap">
@@ -98,6 +150,10 @@ function disable(): void {
             </div>
             <div v-if="f.help" class="nsh-help">{{ f.help }}</div>
           </div>
+        </div>
+        <div v-if="provider.id === 'selfhost' && manual" class="nsh-field">
+          <span class="nsh-label" />
+          <a href="javascript:void(0)" class="nsh-link" @click="manual = false">改用同步码</a>
         </div>
         <div v-if="provider.homepage" class="nsh-field">
           <span class="nsh-label" />
@@ -177,6 +233,14 @@ function disable(): void {
 </template>
 
 <style>
+.nsh-code-error {
+  color: var(--nsh-danger);
+}
+.nsh-mode-switch {
+  display: inline-block;
+  margin-top: 6px;
+  font-size: 12px;
+}
 .nsh-sync-providers {
   margin-bottom: 16px;
 }
