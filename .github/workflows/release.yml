@@ -49,7 +49,7 @@ jobs:
       - name: 汇总产物
         run: |
           cp dist/nodeseek-helper.user.js dist/nodeseek-helper.inject.js dist/nsh-proxy.js \
-             dist/nodeseek-helper.sgmodule dist/nodeseek-helper.snippet dist/nodeseek-helper.plugin dist/nodeseek-helper.stoverride release/
+             dist/nodeseek-helper.sgmodule dist/nodeseek-helper.module dist/nodeseek-helper.snippet dist/nodeseek-helper.plugin dist/nodeseek-helper.stoverride release/
           cd release && sha256sum * > SHA256SUMS.txt
 
       - name: 发布 Release

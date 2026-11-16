@@ -52,3 +52,24 @@ describe('代理模块匹配规则', () => {
     expect(nsh.test('https://www.nodeseek.com/__nsh/other')).toBe(false);
   });
 });
+
+describe('Shadowrocket 模块', async () => {
+  // @ts-expect-error 构建脚本是 .mjs，无类型声明
+  const { outputs } = (await import('../scripts/build-proxy.mjs')) as { outputs: Record<string, string> };
+  const mod = outputs['nodeseek-helper.module'];
+
+  it('与 Surge 模块使用同一份脚本、同样的匹配规则与 MITM 域名', () => {
+    const sg = outputs['nodeseek-helper.sgmodule'];
+    const scriptOf = (s: string): string[] => [...s.matchAll(/script-path=(\S+)/g)].map((m) => m[1]);
+    expect(scriptOf(mod)).toEqual(scriptOf(sg));
+    expect(mod).toContain(`pattern=${PAGE as string},`);
+    expect(mod).toContain(`pattern=${NSH as string},`);
+    expect(mod).toMatch(/\[MITM\]\nhostname = %APPEND% www\.nodeseek\.com, www\.deepflood\.com/);
+  });
+
+  it('布尔参数写 true（不用 1），上传中转开启二进制模式', () => {
+    expect(mod).not.toMatch(/=(1|0),/);
+    expect(mod).toMatch(/nsh-relay = type=http-request,.*requires-body=true,binary-body-mode=true/);
+    expect(mod).toMatch(/nsh-inject = type=http-response,.*requires-body=true/);
+  });
+});

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { acquireSlot, loadedUrls, releaseSlot, RETRY_DELAYS } from '../core/image-queue';
+import { acquireSlot, loadedUrls, RETRY_DELAYS } from '../core/image-queue';
 import { settings } from '../core/store';
 import { hidePreview, isAnimatedUrl, showPreview } from '../core/ui';
 
@@ -23,28 +23,33 @@ let timer = 0;
 /* ---------- 进入可视区后排队加载，失败退避重试（应对图床 429 限流） ---------- */
 const src = ref('');
 let attempt = 0;
-let holding = false;
+/** 当前持有的加载名额（归还函数） */
+let release: (() => void) | null = null;
+let alive = true;
 let io: IntersectionObserver | null = null;
 let retryTimer = 0;
 
+let queued = false;
+
 async function startLoad(): Promise<void> {
-  if (src.value) return;
+  if (src.value || queued) return;
   if (loadedUrls.has(props.url)) {
     src.value = props.url;
     return;
   }
-  await acquireSlot();
-  holding = true;
+  queued = true;
+  const r = await acquireSlot(() => alive);
+  queued = false;
+  if (!alive || src.value) return r();
+  release = r;
   failed.value = false;
   // 重试时加参数绕过浏览器对失败请求的短暂缓存
   src.value = attempt ? `${props.url}${props.url.includes('?') ? '&' : '?'}r=${attempt}` : props.url;
 }
 
 function settle(): void {
-  if (holding) {
-    holding = false;
-    releaseSlot();
-  }
+  release?.();
+  release = null;
 }
 
 function onImgLoad(e: Event): void {
@@ -147,6 +152,7 @@ function touchEnd(e: TouchEvent): void {
 }
 
 onBeforeUnmount(() => {
+  alive = false;
   leave();
   io?.disconnect();
   clearTimeout(retryTimer);

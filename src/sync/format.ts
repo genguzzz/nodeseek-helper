@@ -50,7 +50,6 @@ export const SYNCED_SETTING_KEYS = [
   'showStickerButton',
   'showFastNav',
   'showHeaderEntry',
-  'hideNativeStickerBar',
   'officialFav',
   'officialUsage',
   'seededPacks',
@@ -129,8 +128,10 @@ function localItems(): LocalItem[] {
 /**
  * 由本地数据生成同步文档：内容摘要与上次同步不同的条目时间戳置为 now，
  * 本地已不存在的条目生成墓碑。会就地更新 meta。
+ * `stats.changed` 返回与上次同步相比发生变化（新增 / 修改 / 删除）的条目数。
  */
-export function buildLocalDoc(meta: SyncMeta, device: string, now = Date.now()): SyncDocument {
+export function buildLocalDoc(meta: SyncMeta, device: string, now = Date.now(), stats?: { changed: number }): SyncDocument {
+  let changed = 0;
   const doc: SyncDocument = {
     schema: SCHEMA,
     updatedAt: now,
@@ -146,18 +147,25 @@ export function buildLocalDoc(meta: SyncMeta, device: string, now = Date.now()):
     seen.add(it.key);
     const h = hash(it.value);
     const m = meta[it.key];
-    if (!m || m.d || m.h !== h) meta[it.key] = { h, t: now };
+    if (!m || m.d || m.h !== h) {
+      meta[it.key] = { h, t: now };
+      changed++;
+    }
     put(doc, it.key, { v: it.value, t: meta[it.key].t } as Entry<never>);
   }
   for (const [key, m] of Object.entries(meta)) {
     if (seen.has(key)) continue;
-    if (!m.d) meta[key] = { h: '', t: now, d: true };
+    if (!m.d) {
+      meta[key] = { h: '', t: now, d: true };
+      changed++;
+    }
     if (now - meta[key].t > TOMBSTONE_TTL) {
       delete meta[key];
       continue;
     }
     put(doc, key, { t: meta[key].t, d: true });
   }
+  if (stats) stats.changed = changed;
   return doc;
 }
 

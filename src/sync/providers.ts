@@ -10,9 +10,16 @@ interface HttpResult {
   headers: Record<string, string>;
 }
 
-function http(method: string, url: string, headers: Record<string, string> = {}, body?: string, timeout = 30_000): Promise<HttpResult> {
+function http(
+  method: string,
+  url: string,
+  headers: Record<string, string> = {},
+  body?: string,
+  timeout = 30_000,
+  signal?: AbortSignal,
+): Promise<HttpResult> {
   return new Promise((resolve, reject) => {
-    GM_xmlhttpRequest({
+    const req = GM_xmlhttpRequest({
       url,
       method: method as 'GET',
       headers,
@@ -29,7 +36,10 @@ function http(method: string, url: string, headers: Record<string, string> = {},
       },
       onerror: (e: unknown) => reject(new Error(gmErrorMessage(e, url))),
       ontimeout: () => reject(new Error('请求超时')),
+      onabort: () => reject(new Error('已取消')),
     });
+    // 真正中断请求（而不只是丢弃结果），释放连接给后续的拉取 / 推送
+    signal?.addEventListener('abort', () => req.abort(), { once: true });
   });
 }
 
@@ -107,7 +117,7 @@ const selfhost: SyncProvider = {
   },
   async watch(v, etag, signal) {
     if (signal.aborted) return false;
-    const r = await http('GET', `${trimBase(v.base)}/v1/sync/watch?etag=${encodeURIComponent(etag)}&timeout=25`, { Authorization: `Bearer ${v.token}` }, undefined, 35_000);
+    const r = await http('GET', `${trimBase(v.base)}/v1/sync/watch?etag=${encodeURIComponent(etag)}&timeout=25`, { Authorization: `Bearer ${v.token}` }, undefined, 35_000, signal);
     if (r.status === 200) return true;
     if (r.status === 304) return false;
     // 限流 / 认证失败 / 服务异常：抛出让调用方退避，不能当作「无变化」立刻重连

@@ -17,12 +17,14 @@ export interface SyncConfig {
   lastEtag: string;
   lastSyncAt: number;
   lastError: string;
+  /** 本机有尚未推送的修改（持久化：修改后立即关闭页面，下次打开仍会推送） */
+  dirty: boolean;
   meta: SyncMeta;
 }
 
 const KEY = 'nsh_sync_v1';
 const MAX_RETRY = 3;
-const DEBOUNCE_MS = 3000;
+const DEBOUNCE_MS = 1500;
 
 const defaults = (): SyncConfig => ({
   provider: '',
@@ -34,18 +36,29 @@ const defaults = (): SyncConfig => ({
   lastEtag: '',
   lastSyncAt: 0,
   lastError: '',
+  dirty: false,
   meta: {},
 });
 
 export const syncConfig = reactive<SyncConfig>({ ...defaults(), ...(GM_getValue<Partial<SyncConfig>>(KEY, {}) ?? {}) });
-export const syncState = reactive({ running: false, status: '' as string, dirty: false });
+export const syncState = reactive({ running: false, status: '' as string });
 
 let saveTimer = 0;
-function saveConfig(): void {
+const flushConfig = (): void => {
   clearTimeout(saveTimer);
-  saveTimer = window.setTimeout(() => GM_setValue(KEY, JSON.parse(JSON.stringify(toRaw(syncConfig)))), 300);
-}
-watch(syncConfig, saveConfig, { deep: true });
+  saveTimer = 0;
+  GM_setValue(KEY, JSON.parse(JSON.stringify(toRaw(syncConfig))));
+};
+watch(
+  syncConfig,
+  () => {
+    clearTimeout(saveTimer);
+    saveTimer = window.setTimeout(flushConfig, 300);
+  },
+  { deep: true },
+);
+// 关闭页面前把还没写入的配置（如 dirty 标记）落盘
+window.addEventListener('pagehide', () => saveTimer && flushConfig());
 
 const valuesOf = (id: string): Values => (syncConfig.values[id] ??= {});
 
@@ -61,6 +74,8 @@ const WATCH_BACKOFF_MAX = 300_000;
 
 let applying = false;
 let queued = false;
+/** 本地修改计数：同步开始后又有新修改时，结束时不能清掉 dirty */
+let changeGen = 0;
 
 /**
  * 一次完整同步：拉取 → 解密 → 条目级合并 → 写回本地 → 必要时推送。
@@ -84,6 +99,9 @@ export async function syncNow(reason = 'manual'): Promise<void> {
     syncConfig.lastError = '';
     return;
   }
+  // 正在挂起的实时同步长轮询会占住连接，拉取 / 推送要排在它后面等到超时（最长 25 秒）：先中断，同步完再恢复
+  const resumeWatch = reason !== 'watch' && stopWatch();
+  const gen = changeGen;
   try {
     for (let attempt = 0; attempt < MAX_RETRY; attempt++) {
       const pulled = await p.pull(v, syncConfig.lastEtag || undefined);
@@ -91,9 +109,12 @@ export async function syncNow(reason = 'manual'): Promise<void> {
       const deduped = dedupeByUrl(stickerData.stickers);
       if (deduped.length !== stickerData.stickers.length) {
         stickerData.stickers = deduped;
-        syncState.dirty = true;
+        syncConfig.dirty = true;
       }
-      const local = buildLocalDoc(syncConfig.meta, syncConfig.deviceId);
+      const stats = { changed: 0 };
+      const local = buildLocalDoc(syncConfig.meta, syncConfig.deviceId, Date.now(), stats);
+      // meta 已记录这次的变化：推送成功前保持 dirty，失败后下次仍会推送
+      if (stats.changed) syncConfig.dirty = true;
       let next = local;
       let remoteHash = '';
       // 本机已设置加密口令而远端仍是明文（如先同步、后设置口令）：即使内容无变化也要重新加密推送
@@ -112,7 +133,7 @@ export async function syncNow(reason = 'manual'): Promise<void> {
         }
       }
       const etag = pulled.status === 'notModified' ? syncConfig.lastEtag : pulled.etag;
-      const needPush = pulled.status === 'empty' || needEncrypt || (pulled.status === 'notModified' ? syncState.dirty : docHash(next) !== remoteHash);
+      const needPush = pulled.status === 'empty' || needEncrypt || (pulled.status === 'notModified' ? syncConfig.dirty : docHash(next) !== remoteHash);
       if (!needPush) {
         syncConfig.lastEtag = etag ?? '';
         break;
@@ -132,7 +153,7 @@ export async function syncNow(reason = 'manual'): Promise<void> {
     // OneDrive 会轮换 refresh token，pull 时也要回写
     const upd = p.updates?.(v);
     if (upd) Object.assign(v, upd);
-    syncState.dirty = false;
+    if (changeGen === gen) syncConfig.dirty = false;
     syncConfig.lastSyncAt = Date.now();
     syncConfig.lastError = '';
     syncState.status = `已同步（${reason === 'manual' ? '手动' : '自动'}）`;
@@ -145,6 +166,36 @@ export async function syncNow(reason = 'manual'): Promise<void> {
       queued = false;
       void syncNow(reason);
     }
+    if (resumeWatch) void watchLoop();
+  }
+}
+
+/**
+ * 用本机数据覆盖远端（忘记加密口令时的重置）：不读取、不合并远端内容，直接以本机数据 + 当前口令重新写入。
+ * 远端原有数据无法解密，覆盖后其他设备需改用新口令（或粘贴本机的接入码）。
+ */
+export async function overwriteRemote(): Promise<void> {
+  const p = syncProviderById(syncConfig.provider);
+  if (!p || syncState.running) return;
+  syncState.running = true;
+  syncState.status = '同步中…';
+  const resumeWatch = stopWatch();
+  const gen = changeGen;
+  try {
+    const v = valuesOf(p.id);
+    const pulled = await p.pull(v);
+    const doc = buildLocalDoc(syncConfig.meta, syncConfig.deviceId);
+    syncConfig.lastEtag = await p.push(v, await seal(doc, syncConfig.passphrase), pulled.status === 'empty' ? undefined : pulled.etag);
+    if (changeGen === gen) syncConfig.dirty = false;
+    syncConfig.lastSyncAt = Date.now();
+    syncConfig.lastError = '';
+    syncState.status = '已用本机数据重置云端';
+  } catch (e) {
+    syncConfig.lastError = (e as Error).message;
+    syncState.status = '同步失败';
+  } finally {
+    syncState.running = false;
+    if (resumeWatch) void watchLoop();
   }
 }
 
@@ -154,12 +205,20 @@ let debounceTimer = 0;
 let intervalTimer = 0;
 let watchAbort: AbortController | null = null;
 
+/** 中断实时同步长轮询；返回此前是否在运行 */
+function stopWatch(): boolean {
+  const running = !!watchAbort && !watchAbort.signal.aborted;
+  watchAbort?.abort();
+  return running;
+}
+
 const enabled = (): boolean => !!syncConfig.provider && syncConfig.auto;
 
 function onLocalChange(): void {
   // 来自同步写回或其他标签页的变更不触发推送
   if (applying || isApplyingRemote()) return;
-  syncState.dirty = true;
+  changeGen++;
+  syncConfig.dirty = true;
   if (!enabled()) return;
   clearTimeout(debounceTimer);
   debounceTimer = window.setTimeout(() => void syncNow('change'), DEBOUNCE_MS);

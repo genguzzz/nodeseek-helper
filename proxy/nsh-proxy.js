@@ -1,5 +1,5 @@
 /*
- * NodeSeek 助手 · 代理工具通用脚本（Surge / Loon / Stash / Quantumult X）
+ * NodeSeek 助手 · 代理工具通用脚本（Surge / Shadowrocket / Loon / Stash / Quantumult X）
  * 版本 __NSH_VERSION__
  *
  * 三种用途，由请求路径区分：
@@ -42,7 +42,7 @@ function b64decode(s) {
   return decodeURIComponent(out);
 }
 
-/** 统一的 HTTP 请求：QX 用 $task.fetch，其余用 $httpClient */
+/** 统一的 HTTP 请求：QX 用 $task.fetch，其余（Surge / Shadowrocket / Loon / Stash）用 $httpClient */
 function http(opts) {
   if (isQX) {
     const req = { url: opts.url, method: opts.method, headers: opts.headers };

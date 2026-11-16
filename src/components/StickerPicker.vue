@@ -1,35 +1,15 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue';
-import { renderTemplate, settings, stickerData, useSticker, type Sticker } from '../core/store';
-import { official, officialStickers, isOfficialId } from '../core/official';
-import { openPanel, hidePreview, ui, closePicker } from '../core/ui';
+import { settings, stickerData, type Sticker } from '../core/store';
+import { official } from '../core/official';
+import { openPanel, ui, closePicker } from '../core/ui';
+import { favList, isFav, searchStickers, stickersOfTab, textForSticker, toggleFav } from '../core/sticker-lists';
 import StickerThumb from './StickerThumb.vue';
 import GroupIcon from './GroupIcon.vue';
 
 const emit = defineEmits<{ insert: [text: string, keepOpen: boolean] }>();
 
-const RECENT_LIMIT = 24;
 type Tab = 'fav' | 'recent' | 'app' | string;
-
-/** 官方表情全集（按转义码索引），收藏 / 最近使用里要用 */
-const officialAll = computed(() => official.groups.flatMap(officialStickers));
-const officialByCode = computed(() => new Map(officialAll.value.map((s) => [s.code as string, s])));
-
-const favList = computed<Sticker[]>(() => [
-  ...stickerData.stickers.filter((s) => s.favorite),
-  ...settings.officialFav.map((c) => officialByCode.value.get(c)).filter((s): s is Sticker => !!s),
-]);
-
-const recentList = computed<Sticker[]>(() => {
-  const mine = stickerData.stickers.filter((s) => s.lastUsedAt > 0).map((s) => ({ s, t: s.lastUsedAt }));
-  const off = Object.entries(settings.officialUsage)
-    .map(([code, u]) => ({ s: officialByCode.value.get(code), t: u.t }))
-    .filter((x): x is { s: Sticker; t: number } => !!x.s);
-  return [...mine, ...off]
-    .sort((a, b) => b.t - a.t)
-    .slice(0, RECENT_LIMIT)
-    .map((x) => x.s);
-});
 
 /** 当前编辑器是否有原生 App 功能（投票 / 星尘） */
 const appItems = computed(() => {
@@ -60,20 +40,7 @@ function initialTab(): Tab {
 const tab = ref<Tab>(initialTab());
 const keyword = ref('');
 
-const list = computed<Sticker[]>(() => {
-  const kw = keyword.value.trim().toLowerCase();
-  if (kw) {
-    const hit = (s: Sticker): boolean => s.name.toLowerCase().includes(kw) || s.url.toLowerCase().includes(kw) || !!s.code?.includes(kw);
-    return [...stickerData.stickers.filter(hit), ...officialAll.value.filter(hit)].slice(0, 200);
-  }
-  if (tab.value === 'fav') return favList.value;
-  if (tab.value === 'recent') return recentList.value;
-  if (tab.value.startsWith('ns:')) {
-    const g = official.groups.find((x) => `ns:${x.group}` === tab.value);
-    return g ? officialStickers(g) : [];
-  }
-  return stickerData.stickers.filter((s) => s.groupId === tab.value);
-});
+const list = computed<Sticker[]>(() => (keyword.value.trim() ? searchStickers(keyword.value) : stickersOfTab(tab.value)));
 
 /* 分组条：横向滚动 + 两端渐隐（有内容被遮住的一侧才显示蒙版） */
 const tabsEl = ref<HTMLElement>();
@@ -106,29 +73,8 @@ watch(tab, () =>
 );
 onMounted(() => nextTick(updateFade));
 
-const isFav = (s: Sticker): boolean => (s.code && isOfficialId(s.id) ? settings.officialFav.includes(s.code) : s.favorite);
-
 function pick(s: Sticker, e: MouseEvent): void {
-  hidePreview();
-  if (s.code && isOfficialId(s.id)) {
-    // 官方表情：与原生一致，发送转义码
-    const u = settings.officialUsage[s.code] ?? { c: 0, t: 0 };
-    settings.officialUsage[s.code] = { c: u.c + 1, t: Date.now() };
-    emit('insert', ` ${s.code} `, e.shiftKey);
-    return;
-  }
-  useSticker(s);
-  emit('insert', ' ' + renderTemplate(settings.stickerTemplate, { url: s.url, name: s.name }) + ' ', e.shiftKey);
-}
-
-function toggleFav(s: Sticker): void {
-  if (s.code && isOfficialId(s.id)) {
-    const i = settings.officialFav.indexOf(s.code);
-    if (i > -1) settings.officialFav.splice(i, 1);
-    else settings.officialFav.push(s.code);
-    return;
-  }
-  s.favorite = !s.favorite;
+  emit('insert', textForSticker(s), e.shiftKey);
 }
 
 /** 触发原生 App 功能：打开原生 App 分组并点击对应项（原生表情栏隐藏时同样有效） */
@@ -288,8 +234,9 @@ function runApp(key: string): void {
   gap: 2px;
   overflow-x: auto;
   overflow-y: hidden;
-  /* 底部横向滚动条（6px）+ 间距（2px）只占下方空间，上方补同样的 8px，文字与右侧搜索 / 管理保持同一中线 */
-  padding: 8px 0 2px;
+  /* 滚动条隐藏：滚轮 / 触控板横向滚动，被遮住的一侧有渐隐提示 */
+  padding: 4px 0;
+  scrollbar-width: none;
   --fade-l: 0px;
   --fade-r: 0px;
   -webkit-mask-image: linear-gradient(to right, transparent 0, #000 var(--fade-l), #000 calc(100% - var(--fade-r)), transparent 100%);
@@ -302,25 +249,7 @@ function runApp(key: string): void {
   --fade-r: 28px;
 }
 .nsh-picker-tabs::-webkit-scrollbar {
-  height: 6px;
-}
-.nsh-picker-tabs::-webkit-scrollbar-track {
-  background: transparent;
-}
-/* 新版 Chromium 中标准属性 scrollbar-width 会覆盖 ::-webkit-scrollbar，只给不支持该伪元素的 Firefox 用 */
-@supports not selector(::-webkit-scrollbar) {
-  .nsh-picker-tabs {
-    scrollbar-width: thin;
-    scrollbar-color: var(--nsh-border) transparent;
-  }
-}
-.nsh-picker-tabs::-webkit-scrollbar-thumb {
-  background: var(--nsh-text-faint);
-  border-radius: 3px;
-}
-.nsh-picker-tabs::-webkit-scrollbar-thumb:hover,
-.nsh-picker-tabs::-webkit-scrollbar-thumb:active {
-  background: var(--nsh-text-sub);
+  display: none;
 }
 .nsh-picker-sep {
   width: 1px;

@@ -1,4 +1,4 @@
-// 生成代理工具产物：通用脚本 + Surge / Loon / Quantumult X / Stash 模块
+// 生成代理工具产物：通用脚本 + Surge / Shadowrocket / Loon / Quantumult X / Stash 模块
 // 发布地址由 NSH_PUBLISH_BASE 指定（dist 目录对外可访问的 URL，例如 jsDelivr GitHub 链接）
 import fs from 'node:fs';
 import path from 'node:path';
@@ -36,6 +36,20 @@ const outputs = {
 [Script]
 nsh-inject = type=http-response,pattern=${PAGE},requires-body=1,max-size=4194304,timeout=10,script-path=${script}
 nsh-relay = type=http-request,pattern=${NSH},requires-body=1,binary-body-mode=1,max-size=20971520,timeout=120,script-path=${script}
+
+[MITM]
+hostname = %APPEND% ${hosts.join(', ')}
+`,
+
+  // Shadowrocket（小火箭）兼容 Surge 的模块格式与 $httpClient / $persistentStore / $done 接口，同一份脚本即可运行；
+  // 参数统一写 true（小火箭对 1 / true 的兼容不如 Surge 宽松），单独发布便于在「配置 → 模块」里按地址添加
+  'nodeseek-helper.module': `#!name=${NAME}
+#!desc=${DESC} v${version}
+#!category=NodeSeek
+
+[Script]
+nsh-inject = type=http-response,pattern=${PAGE},requires-body=true,max-size=4194304,timeout=10,script-path=${script}
+nsh-relay = type=http-request,pattern=${NSH},requires-body=true,binary-body-mode=true,max-size=20971520,timeout=120,script-path=${script}
 
 [MITM]
 hostname = %APPEND% ${hosts.join(', ')}
@@ -88,6 +102,8 @@ script-providers:
     interval: 86400
 `,
 };
+
+export { outputs };
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
 for (const [file, content] of Object.entries(outputs)) fs.writeFileSync(path.join(dist, file), content);

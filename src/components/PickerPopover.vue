@@ -9,7 +9,7 @@ import StickerPicker from './StickerPicker.vue';
  *   只有编辑器位于内部滚动容器里时，才在该容器滚动时校正一次位置。
  * - 手机（窄屏或触摸设备）：底部抽屉（bottom sheet），带遮罩与拖拽手柄，下拉关闭，内部原生惯性滚动。
  */
-const WIDTH = 480;
+const WIDTH = 520;
 const GAP = 6;
 const CLOSE_DRAG = 90;
 

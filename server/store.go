@@ -117,8 +117,13 @@ func (s *Store) Meta(id string) (meta, bool) {
 	return m, ok
 }
 
-// Open 打开空间文件用于流式读取
+// Open 打开空间文件用于流式读取。
+// 持有空间写锁读取元数据并打开文件，保证返回的 ETag 与文件内容是同一版本
+// （写入用 rename 原子替换，已打开的文件句柄不受之后的写入影响）。
 func (s *Store) Open(id string) (*os.File, meta, error) {
+	sp := s.space(id)
+	sp.mu.Lock()
+	defer sp.mu.Unlock()
 	m, ok := s.Meta(id)
 	if !ok {
 		return nil, meta{}, errNotFound

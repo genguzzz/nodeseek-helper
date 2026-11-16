@@ -69,14 +69,12 @@ type BoolKey =
   | 'showUploadButton'
   | 'showStickerButton'
   | 'showFastNav'
-  | 'showHeaderEntry'
-  | 'hideNativeStickerBar';
+  | 'showHeaderEntry';
 const entryToggles: { key: BoolKey; label: string; help: string }[] = [
   { key: 'showUploadButton', label: '上传图片按钮', help: '编辑器工具栏与右上角的「云朵上传」按钮；关闭后仍可粘贴 / 拖拽上传' },
-  { key: 'showStickerButton', label: '表情按钮', help: '编辑器工具栏的笑脸按钮（工具栏隐藏时显示在右上角）' },
+  { key: 'showStickerButton', label: '表情入口', help: '编辑器工具栏的笑脸按钮（工具栏隐藏时显示在右上角），以及底部原生表情栏前的收藏 / 最近 / 自定义分组' },
   { key: 'showFastNav', label: '右下角助手按钮', help: '回到顶部按钮上方的「助手」快捷菜单' },
   { key: 'showHeaderEntry', label: '顶部导航图标', help: '导航栏主题切换旁的花火图标' },
-  { key: 'hideNativeStickerBar', label: '隐藏底部原生表情栏', help: '官方表情（AC娘 / 洋葱头 / 小黄鸡 / Fluent）与 App 功能已并入工具栏表情面板，隐藏后编辑器更紧凑' },
 ];
 const toggles: { key: BoolKey; label: string; help: string }[] = [
   { key: 'pasteUpload', label: '粘贴图片自动上传', help: '在回复 / 发帖编辑器中 Ctrl+V 截图或图片时自动上传并插入' },
@@ -101,7 +99,7 @@ const toggles: { key: BoolKey; label: string; help: string }[] = [
 
     <div class="nsh-row">
       <div class="nsh-row-text">
-        <div>表情面板默认打开</div>
+        <div>表情弹窗默认打开</div>
         <div class="nsh-help">点开工具栏笑脸时先显示的分组；选中的分组被删除后自动回退</div>
       </div>
       <select v-model="settings.pickerDefaultTab" class="nsh-select nsh-default-tab">

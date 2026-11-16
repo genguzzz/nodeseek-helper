@@ -97,7 +97,6 @@ function bindEntryToggles(): void {
     c.toggle('nsh-hide-sticker', !settings.showStickerButton);
     c.toggle('nsh-hide-fastnav', !settings.showFastNav);
     c.toggle('nsh-hide-header', !settings.showHeaderEntry);
-    c.toggle('nsh-hide-native-exp', settings.hideNativeStickerBar);
   });
 }
 

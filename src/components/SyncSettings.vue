@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { GM_setClipboard } from '$';
-import { resetSyncCursor, restartSync, syncConfig, syncNow, syncState } from '../sync/engine';
+import { overwriteRemote, resetSyncCursor, restartSync, syncConfig, syncNow, syncState } from '../sync/engine';
 import { decodeSyncCode, encodeSyncCode, looksLikeSyncCode } from '../sync/sync-code';
 import { onedrivePollLogin, onedriveStartLogin, syncProviderById, syncProviders, type DeviceCode } from '../sync/providers';
-import { toast } from '../core/ui';
+import { askConfirm, toast } from '../core/ui';
 
 const reveal = ref<Record<string, boolean>>({});
 const provider = computed(() => syncProviderById(syncConfig.provider));
@@ -68,6 +68,21 @@ function onPassphraseChange(): void {
   resetSyncCursor();
 }
 let passphraseBefore = syncConfig.passphrase;
+
+/** 忘记口令：用本机数据 + 当前口令重置云端（远端旧数据无法解密，只能覆盖） */
+async function resetRemote(): Promise<void> {
+  if (!syncConfig.passphrase) {
+    toast('先在上方填写新的加密口令（也可留空不加密）', 'info', 3500);
+  }
+  const ok = await askConfirm({
+    title: '用本机数据重置云端',
+    message: `云端现有数据（由其他设备用旧口令加密）将被本机数据覆盖，且无法恢复。${syncConfig.passphrase ? '之后其他设备需填写新口令，或粘贴本机的「接入码」。' : '当前口令为空，云端数据将以明文（压缩）保存。'}`,
+    okText: '覆盖云端',
+  });
+  if (ok !== 'ok') return;
+  await overwriteRemote();
+  if (!syncConfig.lastError) toast('云端已重置为本机数据', 'success');
+}
 
 /** 已配置的设备生成接入码（地址 + 令牌 + 加密口令），新设备粘贴一次即可 */
 const canShare = computed(() => syncConfig.provider === 'selfhost' && !!syncConfig.values.selfhost?.base && !!syncConfig.values.selfhost?.token);
@@ -222,7 +237,7 @@ function disable(): void {
       <div class="nsh-row">
         <div class="nsh-row-text">
           <div>自动同步</div>
-          <div class="nsh-help">修改后 3 秒自动推送；页面切回前台时拉取；自建服务额外支持实时推送</div>
+          <div class="nsh-help">修改后 1.5 秒自动推送；页面切回前台时拉取；自建服务额外支持实时推送</div>
         </div>
         <button class="nsh-switch" :class="{ on: syncConfig.auto }" @click="syncConfig.auto = !syncConfig.auto" />
       </div>
@@ -247,6 +262,7 @@ function disable(): void {
       </div>
       <div class="nsh-io-actions">
         <button class="nsh-btn primary" :disabled="syncState.running" @click="syncNow('manual')">立即同步</button>
+        <button v-if="syncState.status === '口令错误'" class="nsh-btn" title="忘记了口令：放弃云端旧数据，用本机数据和当前口令重新写入" @click="resetRemote">忘记口令？重置云端</button>
         <button v-if="canShare" class="nsh-btn" title="复制包含服务地址、令牌与加密口令的接入码，用于新设备一键接入" @click="copyJoinCode">复制接入码</button>
         <span class="nsh-spacer" />
         <button class="nsh-btn ghost sm danger" @click="disable">停用同步</button>

@@ -1,5 +1,8 @@
+import { createApp, type App } from 'vue';
 import { unsafeWindow } from '$';
 import { settings } from './store';
+import { recordOfficialUse } from './sticker-lists';
+import InlineStickers from '../components/InlineStickers.vue';
 import { openPanel, togglePicker } from './ui';
 import { imageFilesOf, uploadMany, type CM } from './upload-flow';
 import { ICON_EMOJI, ICON_GEAR, ICON_UPLOAD } from './icons';
@@ -85,6 +88,50 @@ function injectTopButtons(md: Element, cm: CM): void {
   ref ? ref.before(emoji, upload, gear) : top.append(emoji, upload, gear);
 }
 
+/** 每个编辑器挂一个小 Vue 应用，负责并入原生表情栏的标签与表情网格 */
+const inlineApps = new WeakMap<Element, { app: App; panel: HTMLElement; bar: Element }>();
+
+/**
+ * 把助手表情并入底部原生表情栏：
+ * 原生栏 = AC娘 / 洋葱头 / 小黄鸡 / Fluent | App；在最前面插入「收藏 / 最近 / 自定义分组」，最右侧放搜索与表情设置，
+ * 表情网格放在原生 .exp-container 之后。原生栏被 Vue 重建时卸载旧应用重新挂载。
+ */
+function injectNativeBar(md: HTMLElement, cm: CM): void {
+  const bar = md.querySelector<HTMLElement>('.expression');
+  const prev = inlineApps.get(md);
+  if (prev?.bar === bar && prev.panel.isConnected) return;
+  if (prev) {
+    prev.app.unmount();
+    prev.panel.remove();
+    inlineApps.delete(md);
+  }
+  if (!bar) return;
+  bar.classList.add('nsh-exp-bar');
+  const tabsHost = document.createElement('span');
+  tabsHost.className = 'nsh-exp-tabs';
+  const toolsHost = document.createElement('span');
+  toolsHost.className = 'nsh-exp-tools';
+  bar.prepend(tabsHost);
+  bar.append(toolsHost);
+  const panel = document.createElement('div');
+  panel.className = 'nsh-scope nsh-exp-host';
+  const container = bar.parentElement?.querySelector(':scope > .exp-container');
+  (container ?? bar).after(panel);
+  const app = createApp(InlineStickers, { bar, tabsHost, toolsHost, insert: (text: string) => insertText(cm, text) });
+  app.mount(panel);
+  inlineApps.set(md, { app, panel, bar });
+}
+
+/** 原生表情被点击时也计入「最近使用」 */
+function trackNativeStickers(md: HTMLElement): void {
+  md.addEventListener('click', (e) => {
+    const el = (e.target as Element).closest?.('.exp-container .sticker');
+    if (!el) return;
+    const m = /\/sticker\/([a-z]+)\/(\d+)/i.exec(el.getAttribute('src') ?? '');
+    if (m && m[1] !== 'app') recordOfficialUse(`:${m[1]}${m[2]}:`);
+  });
+}
+
 function bindPasteAndDrop(md: HTMLElement, cm: CM): void {
   md.addEventListener(
     'paste',
@@ -133,7 +180,9 @@ export function enhanceEditor(md: HTMLElement): void {
   if (!md.dataset[ENHANCED]) {
     md.dataset[ENHANCED] = '1';
     bindPasteAndDrop(md, cm);
+    trackNativeStickers(md);
   }
+  injectNativeBar(md, cm);
   injectToolbar(md, cm);
   injectTopButtons(md, cm);
 }

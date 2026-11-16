@@ -334,14 +334,11 @@ html.nsh-hide-upload .nsh-tb-upload,
 html.nsh-hide-upload .nsh-top-upload,
 html.nsh-hide-sticker .nsh-tb-emoji,
 html.nsh-hide-sticker .nsh-top-emoji,
+html.nsh-hide-sticker .nsh-exp-tabs,
+html.nsh-hide-sticker .nsh-exp-tools,
+html.nsh-hide-sticker .nsh-exp-host,
 html.nsh-hide-fastnav .nsh-fast-btn,
 html.nsh-hide-header .nsh-head-entry {
-  display: none !important;
-}
-
-/* 原生表情栏已并入工具栏表情面板：隐藏以节省空间（App 功能仍可从面板触发） */
-html.nsh-hide-native-exp .md-editor .expression,
-html.nsh-hide-native-exp .md-editor .exp-container {
   display: none !important;
 }
 

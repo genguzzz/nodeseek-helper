@@ -29,8 +29,6 @@ export interface Settings {
   showStickerButton: boolean;
   showFastNav: boolean;
   showHeaderEntry: boolean;
-  /** 隐藏编辑器底部的原生表情栏（官方表情已并入工具栏表情面板） */
-  hideNativeStickerBar: boolean;
   /** 官方表情的收藏（转义码列表）与使用记录 */
   officialFav: string[];
   officialUsage: Record<string, { c: number; t: number }>;
@@ -103,7 +101,6 @@ const defaultSettings = (): Settings => ({
   showStickerButton: true,
   showFastNav: true,
   showHeaderEntry: true,
-  hideNativeStickerBar: true,
   officialFav: [],
   officialUsage: {},
   hoverPreview: true,
