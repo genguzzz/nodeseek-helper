@@ -48,3 +48,49 @@ describe('顶部导航入口', () => {
     expect(document.querySelectorAll('.nsh-head-entry')).toHaveLength(1);
   });
 });
+
+describe('顶部导航入口：手机端有通知铃铛时放在铃铛左边', () => {
+  it('铃铛在列表项里：包一层同样的 li，紧挨在铃铛前面', async () => {
+    document.body.innerHTML =
+      '<header><div id="nsk-head"><ul class="nav-menu"><li class="m-item" data-v-1><a href="/notification"><svg style="width:20px;height:20px"><use href="#remind-6nce9p47"></use></svg></a></li></ul><div class="color-theme-switcher"><svg></svg></div></div></header>';
+    await load();
+    const bellLi = document.querySelector('a[href="/notification"]')?.closest('li');
+    const prev = bellLi?.previousElementSibling as HTMLElement;
+    expect(prev?.classList.contains('nsh-head-entry-li')).toBe(true);
+    expect(prev?.classList.contains('m-item')).toBe(true);
+    expect(prev?.hasAttribute('data-v-1')).toBe(true);
+    expect(prev?.querySelector('.nsh-head-entry')).not.toBeNull();
+    expect(document.querySelectorAll('.nsh-head-entry')).toHaveLength(1);
+  });
+
+  it('铃铛绝对定位：同样绝对定位，紧挨在铃铛左边', async () => {
+    document.body.innerHTML =
+      '<header><div id="nsk-head"><a class="bell" href="/notification" style="position:absolute;right:40px;top:12px"><svg><use href="#remind"></use></svg></a><div class="color-theme-switcher"><svg></svg></div></div></header>';
+    await load();
+    const bell = document.querySelector('.bell') as HTMLElement;
+    const btn = bell.previousElementSibling as HTMLElement;
+    expect(btn.classList.contains('nsh-head-entry')).toBe(true);
+    expect(btn.style.position).toBe('absolute');
+    expect(parseFloat(btn.style.right)).toBeGreaterThanOrEqual(40); // 铃铛的 right + 铃铛宽度
+    expect(btn.style.top).toBe('12px');
+  });
+
+  it('没有铃铛（电脑端 / 未登录）：仍在日 / 夜间按钮左边', async () => {
+    document.body.innerHTML = HEADER;
+    await load();
+    const btn = document.querySelector<HTMLElement>('.nsh-head-entry');
+    expect(btn?.nextElementSibling?.classList.contains('color-theme-switcher')).toBe(true);
+    expect(btn?.style.right).toBe('37px');
+  });
+});
+
+it('页面加载后铃铛才由前端渲染出来：挪到铃铛左边', async () => {
+  document.body.innerHTML = '<header><div id="nsk-head"><ul class="nav-menu"></ul><div class="color-theme-switcher"><svg></svg></div></div></header>';
+  await load();
+  expect(document.querySelector('.nsh-head-entry')?.nextElementSibling?.classList.contains('color-theme-switcher')).toBe(true);
+  document.querySelector('.nav-menu')!.innerHTML = '<li><a href="/notification"><svg><use href="#remind"></use></svg></a></li>';
+  await new Promise((r) => setTimeout(r, 0));
+  const bellLi = document.querySelector('a[href="/notification"]')!.closest('li')!;
+  expect(bellLi.previousElementSibling?.querySelector('.nsh-head-entry')).not.toBeNull();
+  expect(document.querySelectorAll('.nsh-head-entry')).toHaveLength(1);
+});
