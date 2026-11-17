@@ -4,6 +4,9 @@ import { settings, uid, type HostProfile } from '../core/store';
 import { defaultValues, detectImgBed, makeTestImage, providerById, providers, uploadFile, validateProfile, type ProviderDef } from '../core/uploaders';
 import { toast } from '../core/ui';
 
+/** 配置存储位置：代理注入版在浏览器 localStorage，油猴版在脚本存储 */
+const STORAGE = __NSH_WEB__ ? '浏览器本地存储' : '油猴脚本存储';
+
 const editingId = ref<string>(settings.activeHostId || settings.hosts[0]?.id || '');
 const choosing = ref(settings.hosts.length === 0);
 const showAdvanced = ref(false);
@@ -233,7 +236,7 @@ async function test(): Promise<void> {
           <button class="nsh-btn ghost sm" @click="duplicate">复制配置</button>
           <button class="nsh-btn ghost sm danger" @click="remove">删除</button>
         </div>
-        <p class="nsh-help">配置自动保存，仅存储在本地油猴存储中。</p>
+        <p class="nsh-help">配置自动保存，仅存储在本机（{{ STORAGE }}）。</p>
       </template>
       <div v-else class="nsh-empty">选择左侧配置进行编辑</div>
     </section>

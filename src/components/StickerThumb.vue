@@ -22,6 +22,8 @@ const canvas = ref<HTMLCanvasElement>();
 const hovering = ref(false);
 const frozen = ref(false);
 const failed = ref(false);
+/** 图片已显示（用于加载中的占位底色） */
+const ready = ref(false);
 const animated = computed(() => isAnimatedUrl(props.url));
 /** WebP / AVIF 不一定是动图，角标只给 GIF */
 const isGif = computed(() => /\.gif(\?|#|$)/i.test(props.url));
@@ -61,6 +63,7 @@ function settle(): void {
 
 function onImgLoad(e: Event): void {
   loadedUrls.add(props.url);
+  ready.value = true;
   settle();
   onLoad(e);
 }
@@ -174,7 +177,7 @@ onBeforeUnmount(() => {
   <div
     ref="root"
     class="nsh-thumb"
-    :class="{ playing: hovering || !frozen || touchPlay, failed }"
+    :class="{ playing: hovering || !frozen || touchPlay, failed, loading: !ready && !failed }"
     :style="{ width: size + 'px', height: size + 'px' }"
     @mouseenter="enter"
     @mouseleave="leave"
@@ -201,6 +204,20 @@ onBeforeUnmount(() => {
   border-radius: 4px;
   overflow: hidden;
   flex: none;
+}
+.nsh-thumb.loading {
+  background: var(--nsh-bg-muted);
+  animation: nsh-thumb-pulse 1.4s ease-in-out infinite;
+}
+@keyframes nsh-thumb-pulse {
+  50% {
+    opacity: 0.55;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nsh-thumb.loading {
+    animation: none;
+  }
 }
 .nsh-thumb img,
 .nsh-thumb canvas {

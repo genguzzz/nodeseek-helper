@@ -9,8 +9,13 @@
 <script src="https://cdn.jsdelivr.net/npm/vue@3.5.45/dist/vue.global.prod.js"></script>
 <style>
   /* 摘自 nodeseek.com 线上样式（scoped data-v） */
-  body { margin: 0; font-family: -apple-system, 'PingFang SC', sans-serif; background: #f4f4f4; --bg-sub-color: #fbfbfb; --bg-main-color:#fff; color:#333 }
-  body.dark-layout { background: #1f1f1f; --bg-sub-color: #272727; --bg-main-color:#222; color:#ddd }
+  /* 主题变量取自线上 :root / body.dark-layout（插件 UI 直接引用这些变量） */
+  body { margin: 0; font-family: -apple-system, 'PingFang SC', sans-serif; background: #f4f4f4; color:#333;
+    --main-color:#2ea44f; --sub-color:#45ca6b; --bg-main-color:#fff; --bg-sub-color:#fbfbfb; --glass-color:rgba(0,0,0,.05);
+    --text-color:#333; --link-hover-color:#333; --gray-color:#888; --tabs-bg:#f8fafc; --tab-active-bg:#fff }
+  body.dark-layout { background: #1f1f1f; color:#aaa;
+    --bg-main-color:#272727; --bg-sub-color:#3b3b3b; --glass-color:rgba(255,255,255,.05);
+    --text-color:#aaa; --link-hover-color:#fcfcfc; --gray-color:#888; --tabs-bg:#3b3b3b; --tab-active-bg:#2f2f2f }
   header { background: var(--bg-main-color); box-shadow: 0 1px 2px rgba(0,0,0,.08) }
   #nsk-head { max-width: 1000px; margin: auto; display: flex; align-items: center; height: 52px; gap: 16px; padding: 0 12px }
   .color-theme-switcher { cursor: pointer; font-size: 18px }

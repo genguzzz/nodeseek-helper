@@ -256,7 +256,7 @@ const defaultImportGroup = computed(() => (currentGroup.value ? currentGroup.val
         @dragleave="dragOver = ''"
         @drop.prevent="onGroupDrop($event, g)"
       >
-        <span class="nsh-icon nsh-clickable" title="设置图标" @click.stop="setGroupIcon(g)"><GroupIcon :group="g" /></span>
+        <span class="nsh-icon nsh-clickable" title="设置图标" @click.stop="setGroupIcon(g)"><GroupIcon :group="g" fallback /></span>
         <input
           v-if="renamingGroup === g.id"
           class="nsh-input nsh-inline-input"
@@ -268,11 +268,13 @@ const defaultImportGroup = computed(() => (currentGroup.value ? currentGroup.val
         />
         <span v-else class="nsh-sm-nav-name" @dblclick.stop="renamingGroup = g.id">{{ g.name }}</span>
         <span class="nsh-count">{{ countOf(g.id) }}</span>
-        <span class="nsh-sm-nav-ops">
+        <span v-if="renamingGroup !== g.id" class="nsh-sm-nav-ops">
           <button title="重命名" @click.stop="renamingGroup = g.id">✎</button>
           <button v-if="g.id !== 'default'" title="删除分组" @click.stop="deleteGroup(g)">✕</button>
         </span>
       </div>
+      <!-- 手机端侧栏变为横向分组条，标题行（含新建按钮）隐藏，在末尾提供新建入口 -->
+      <button class="nsh-sm-nav nsh-sm-add-chip" title="新建分组" @click="addGroup">＋ 新建分组</button>
       <div class="nsh-sm-side-foot">
         <span>拖动分组可排序，把表情拖到分组上可移动</span>
         <a href="javascript:void(0)" @click="restoreBuiltin">恢复内置表情包</a>
@@ -511,7 +513,20 @@ const defaultImportGroup = computed(() => (currentGroup.value ? currentGroup.val
   width: auto;
   height: 26px;
   font-size: 12px;
-  padding: 0 6px;
+  padding: 0 24px 0 8px;
+  background-position: right 7px center;
+}
+.nsh-sm-add-chip {
+  display: none;
+}
+/* 触屏没有悬浮：当前选中的分组常显重命名 / 删除按钮 */
+@media (hover: none) {
+  .nsh-sm-nav.active .nsh-sm-nav-ops {
+    display: flex;
+  }
+  .nsh-sm-nav.active .nsh-count {
+    display: none;
+  }
 }
 .nsh-check {
   display: inline-flex;
@@ -650,10 +665,41 @@ const defaultImportGroup = computed(() => (currentGroup.value ? currentGroup.val
   .nsh-sm-bulk {
     padding: 8px 10px;
   }
+  /* 工具栏两行：第一行搜索 + 批量导入，第二行排序与其余按钮等分（::after 作为换行） */
+  .nsh-sm-toolbar {
+    row-gap: 8px;
+  }
+  .nsh-sm-toolbar .nsh-spacer {
+    display: none;
+  }
   .nsh-sm-toolbar .nsh-sm-search {
-    flex: 1 1 100%;
+    order: -2;
+    flex: 1 1 0;
     min-width: 0;
     width: auto;
+    height: 32px;
+  }
+  .nsh-sm-toolbar .nsh-btn.primary {
+    order: -1;
+    height: 32px;
+  }
+  .nsh-sm-toolbar::after {
+    content: '';
+    order: -1;
+    flex-basis: 100%;
+  }
+  /* 第二行：下拉按内容定宽（iOS 下拉需 16px 字号以免聚焦放大），其余按钮缩小字号后均分剩余宽度 */
+  .nsh-sm-toolbar > .nsh-sm-sort {
+    flex: none;
+    width: auto;
+    height: 30px;
+  }
+  .nsh-sm-toolbar > .nsh-btn:not(.primary) {
+    flex: 1 1 0;
+    min-width: 0;
+    height: 30px;
+    padding: 0 6px;
+    font-size: 13px;
   }
   .nsh-sm-grid {
     padding: 10px;
@@ -670,13 +716,39 @@ const defaultImportGroup = computed(() => (currentGroup.value ? currentGroup.val
     width: auto;
     flex: none;
     flex-direction: row;
+    gap: 6px;
+    padding: 8px 10px;
     border-right: none;
     border-bottom: 1px solid var(--nsh-border);
     overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+  }
+  .nsh-sm-side::-webkit-scrollbar {
+    display: none;
   }
   .nsh-sm-nav {
     width: auto;
     flex: none;
+    height: 32px;
+    padding: 0 12px;
+    border: 1px solid var(--nsh-border);
+    border-radius: 16px;
+  }
+  .nsh-sm-nav.active {
+    border-color: transparent;
+  }
+  .nsh-sm-add-chip {
+    display: inline-flex;
+    border-style: dashed;
+    color: var(--nsh-text-sub);
+  }
+  /* 重命名：紧凑输入框，不撑满整条 */
+  .nsh-sm-side .nsh-inline-input {
+    flex: none;
+    width: 7.5em;
+    height: 26px;
+    padding: 0 8px;
   }
   .nsh-sm-side-title,
   .nsh-sm-side-foot {
