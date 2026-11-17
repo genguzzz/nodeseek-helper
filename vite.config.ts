@@ -1,6 +1,6 @@
 import { defineConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
-import monkey, { cdn } from 'vite-plugin-monkey';
+import monkey from 'vite-plugin-monkey';
 import fs from 'node:fs';
 import { nshDevLoader } from './dev/dev-loader';
 import { presetConnectHosts } from './dev/presets';
@@ -23,7 +23,8 @@ export default defineConfig({
   plugins: [
     // 稳定开发加载器：/nsh-dev.user.js 只需安装一次，见 dev/dev-loader.ts
     nshDevLoader(MATCHES),
-    vue(),
+    // 只用 <script setup>：关闭选项式 API 与生产环境调试信息，减小打包后的 Vue
+    vue({ features: { optionsAPI: false, prodDevtools: false, prodHydrationMismatchDetails: false } }),
     monkey({
       entry: 'src/main.ts',
       userscript: {
@@ -58,8 +59,8 @@ export default defineConfig({
       server: { mountGmApi: false },
       build: {
         fileName: 'nodeseek-helper.user.js',
-        // Vue 走 @require CDN，脚本本体保持小巧
-        externalGlobals: { vue: cdn.jsdelivr('Vue', 'dist/vue.global.prod.js') },
+        // Vue 打包进脚本（tree-shaking 后只保留用到的运行时）：单文件、无外部 CDN 依赖，
+        // 比 @require 完整版 vue.global.prod.js（含模板编译器，约 170 KB）小得多
       },
     }),
   ],

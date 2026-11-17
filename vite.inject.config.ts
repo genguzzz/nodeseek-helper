@@ -29,7 +29,8 @@ function inlineCss(): Plugin {
 
 // 代理工具注入版：同一份业务代码，`$` 换成 Web 适配层，Vue 打包进产物
 export default defineConfig({
-  plugins: [vue(), inlineCss()],
+  // 只用 <script setup>：关闭选项式 API 与生产环境调试信息，减小打包后的 Vue
+  plugins: [vue({ features: { optionsAPI: false, prodDevtools: false, prodHydrationMismatchDetails: false } }), inlineCss()],
   resolve: {
     alias: { $: fileURLToPath(new URL('./src/platform/web.ts', import.meta.url)) },
   },
