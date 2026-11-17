@@ -37,8 +37,6 @@ export interface ProviderDef {
   parse(json: unknown, v: Values): string | undefined;
 }
 
-/** 代理注入版（GM API 由 platform/web.ts 提供）里才使用上传进度回调 */
-const IS_WEB_PLATFORM = typeof (GM_xmlhttpRequest as unknown as { nshWeb?: boolean }).nshWeb !== 'undefined';
 
 const str = (v: Values, k: string): string => String(v[k] ?? '').trim();
 const trimBase = (u: string): string => u.replace(/\/+$/, '');
@@ -450,7 +448,7 @@ function uploadOnce(h: HostProfile, file: File, opts: UploadOptions = {}): Promi
       timeout: ATTEMPT_TIMEOUT,
       // 油猴环境不传 upload 回调：嵌套回调跨上下文传递时，部分 Tampermonkey 版本会让请求一直挂起；
       // 代理版（platform/web.ts）走原生 XHR，仍有上传进度
-      ...(IS_WEB_PLATFORM
+      ...(__NSH_WEB__
         ? { upload: { onprogress: (e: ProgressEvent) => e.lengthComputable && opts.onProgress?.(Math.round((e.loaded / e.total) * 100)) } }
         : {}),
       onload: (res) => {

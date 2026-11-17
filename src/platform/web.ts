@@ -130,5 +130,3 @@ export function GM_xmlhttpRequest(d: XhrDetails): { abort: () => void } {
   return { abort: () => xhr.abort() };
 }
 
-/** 标记：上传进度回调只在本适配层（原生 XHR）启用 */
-(GM_xmlhttpRequest as unknown as { nshWeb: boolean }).nshWeb = true;

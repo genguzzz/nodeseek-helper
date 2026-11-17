@@ -10,20 +10,30 @@ interface HttpResult {
   headers: Record<string, string>;
 }
 
-function http(
-  method: string,
-  url: string,
-  headers: Record<string, string> = {},
-  body?: string,
-  timeout = 30_000,
-  signal?: AbortSignal,
-): Promise<HttpResult> {
+interface HttpOptions {
+  headers?: Record<string, string>;
+  body?: string;
+  timeout?: number;
+  signal?: AbortSignal;
+  /** 目标允许跨域（CORS）：代理注入版直接用 fetch 请求，不经代理工具中转 */
+  cors?: boolean;
+}
+
+/**
+ * 同步用的 HTTP 请求。
+ * - 油猴：GM_xmlhttpRequest（扩展后台发出，不受页面跨域限制）；
+ * - 代理注入版：允许 CORS 的地址直接 fetch；其余经同源 /__nsh/relay 由代理工具脚本转发。
+ *   长轮询等请求若走中转，会在代理工具里占用脚本执行直到超时（离开页面后也不会结束），拖慢后续页面的注入。
+ */
+function http(method: string, url: string, o: HttpOptions = {}): Promise<HttpResult> {
+  const timeout = o.timeout ?? 30_000;
+  if (__NSH_WEB__ && o.cors) return viaFetch(method, url, o, timeout);
   return new Promise((resolve, reject) => {
     const req = GM_xmlhttpRequest({
       url,
       method: method as 'GET',
-      headers,
-      data: body,
+      headers: o.headers ?? {},
+      data: o.body,
       responseType: 'text',
       timeout,
       onload: (r) => {
@@ -39,8 +49,33 @@ function http(
       onabort: () => reject(new Error('已取消')),
     });
     // 真正中断请求（而不只是丢弃结果），释放连接给后续的拉取 / 推送
-    signal?.addEventListener('abort', () => req.abort(), { once: true });
+    o.signal?.addEventListener('abort', () => req.abort(), { once: true });
   });
+}
+
+async function viaFetch(method: string, url: string, o: HttpOptions, timeout: number): Promise<HttpResult> {
+  const ctrl = new AbortController();
+  let timedOut = false;
+  const timer = setTimeout(() => {
+    timedOut = true;
+    ctrl.abort();
+  }, timeout);
+  const onAbort = (): void => ctrl.abort();
+  o.signal?.addEventListener('abort', onAbort, { once: true });
+  try {
+    // no-store：条件请求头原样发出，304 交给调用方判断，不被浏览器缓存改写
+    const r = await fetch(url, { method, headers: o.headers, body: o.body, signal: ctrl.signal, cache: 'no-store' });
+    const headers: Record<string, string> = {};
+    r.headers.forEach((v, k) => (headers[k.toLowerCase()] = v));
+    return { status: r.status, text: await r.text(), headers };
+  } catch (e) {
+    if (timedOut) throw new Error('请求超时');
+    if (o.signal?.aborted) throw new Error('已取消');
+    throw new Error(`网络错误：${(e as Error).message || e}`);
+  } finally {
+    clearTimeout(timer);
+    o.signal?.removeEventListener('abort', onAbort);
+  }
 }
 
 const trimBase = (u: string | undefined): string => (u ?? '').trim().replace(/\/+$/, '');
@@ -107,7 +142,7 @@ const selfhost: SyncProvider = {
   ],
   async pull(v, etag) {
     etag = strongEtag(etag);
-    const r = await http('GET', `${trimBase(v.base)}/v1/sync`, { Authorization: `Bearer ${v.token}`, ...(etag ? { 'If-None-Match': etag } : {}) });
+    const r = await http('GET', `${trimBase(v.base)}/v1/sync`, { cors: true, headers: { Authorization: `Bearer ${v.token}`, ...(etag ? { 'If-None-Match': etag } : {}) } });
     const locked = r.headers['x-nsh-locked'] === '1';
     if (r.status === 304) return { status: 'notModified', etag: strongEtag(etag), locked };
     if (r.status === 404) return { status: 'empty', locked };
@@ -117,11 +152,15 @@ const selfhost: SyncProvider = {
   keyScope: (v) => v.token ?? '',
   async push(v, env, etag, keyId) {
     const r = await http('PUT', `${trimBase(v.base)}/v1/sync`, {
-      Authorization: `Bearer ${v.token}`,
-      'Content-Type': 'application/json',
-      ...(etag ? { 'If-Match': etag } : { 'If-None-Match': '*' }),
-      ...(keyId ? { 'X-NSH-Key-Id': keyId } : {}),
-    }, JSON.stringify(env));
+      cors: true,
+      headers: {
+        Authorization: `Bearer ${v.token}`,
+        'Content-Type': 'application/json',
+        ...(etag ? { 'If-Match': etag } : { 'If-None-Match': '*' }),
+        ...(keyId ? { 'X-NSH-Key-Id': keyId } : {}),
+      },
+      body: JSON.stringify(env),
+    });
     if (r.status === 412) throw new ConflictError();
     if (r.status === 403 && r.headers['x-nsh-locked'] === '1') {
       throw new LockedError('这个同步空间已被另一个加密口令锁定：请填写最初设置的口令，或在已同步的设备上复制「接入码」粘贴到这里。忘记口令只能请服务端管理员解锁');
@@ -132,7 +171,12 @@ const selfhost: SyncProvider = {
   },
   async watch(v, etag, signal) {
     if (signal.aborted) return false;
-    const r = await http('GET', `${trimBase(v.base)}/v1/sync/watch?etag=${encodeURIComponent(strongEtag(etag) ?? '')}&timeout=25`, { Authorization: `Bearer ${v.token}` }, undefined, 35_000, signal);
+    const r = await http('GET', `${trimBase(v.base)}/v1/sync/watch?etag=${encodeURIComponent(strongEtag(etag) ?? '')}&timeout=25`, {
+      cors: true,
+      headers: { Authorization: `Bearer ${v.token}` },
+      timeout: 35_000,
+      signal,
+    });
     if (r.status === 200) return true;
     if (r.status === 304) return false;
     // 限流 / 认证失败 / 服务异常：抛出让调用方退避，不能当作「无变化」立刻重连
@@ -162,7 +206,7 @@ const webdav: SyncProvider = {
     { key: 'pass', label: '密码', type: 'password', required: true, help: '坚果云需使用「第三方应用密码」' },
   ],
   async pull(v, etag) {
-    const r = await http('GET', fileUrl(v), { ...davAuth(v), ...(etag ? { 'If-None-Match': etag } : {}) });
+    const r = await http('GET', fileUrl(v), { headers: { ...davAuth(v), ...(etag ? { 'If-None-Match': etag } : {}) } });
     if (r.status === 304) return { status: 'notModified', etag };
     if (r.status === 404) return { status: 'empty' };
     if (r.status !== 200) fail(r, '拉取失败');
@@ -173,16 +217,16 @@ const webdav: SyncProvider = {
     // 只有真正的 ETag 才做条件写；部分服务只给 Last-Modified，这时退化为先读后写
     if (etag && etag.startsWith('"')) headers['If-Match'] = etag;
     else if (etag) {
-      const cur = await http('HEAD', fileUrl(v), davAuth(v));
+      const cur = await http('HEAD', fileUrl(v), { headers: davAuth(v) });
       const now = cur.headers.etag || cur.headers['last-modified'];
       if (now && now !== etag) throw new ConflictError();
     } else headers['If-None-Match'] = '*';
-    const r = await http('PUT', fileUrl(v), headers, JSON.stringify(env));
+    const r = await http('PUT', fileUrl(v), { headers, body: JSON.stringify(env) });
     if (r.status === 412) throw new ConflictError();
     if (r.status === 409) throw new Error('目录不存在，请先在网盘里创建该目录');
     if (r.status >= 300) fail(r, '推送失败');
     if (r.headers.etag) return r.headers.etag;
-    const head = await http('HEAD', fileUrl(v), davAuth(v));
+    const head = await http('HEAD', fileUrl(v), { headers: davAuth(v) });
     return head.headers.etag || head.headers['last-modified'] || String(Date.now());
   },
 };
@@ -211,20 +255,20 @@ const gist: SyncProvider = {
   ],
   async pull(v) {
     if (!v.gistId) return { status: 'empty' };
-    const r = await http('GET', `${GIST_API}/${v.gistId}`, ghHeaders(v));
+    const r = await http('GET', `${GIST_API}/${v.gistId}`, { cors: true, headers: ghHeaders(v) });
     if (r.status === 404) throw new Error('找不到该 Gist，请检查 Gist ID 或令牌权限');
     if (r.status !== 200) fail(r, '拉取失败');
     const g = JSON.parse(r.text) as { history?: { version: string }[]; files: Record<string, { content?: string; truncated?: boolean; raw_url: string }> };
     const f = g.files[SYNC_FILE];
     if (!f) return { status: 'empty', etag: g.history?.[0]?.version };
     let content = f.content ?? '';
-    if (f.truncated) content = (await http('GET', f.raw_url, ghHeaders(v))).text;
+    if (f.truncated) content = (await http('GET', f.raw_url, { cors: true, headers: ghHeaders(v) })).text;
     return { status: 'ok', etag: g.history?.[0]?.version, envelope: parseEnvelope(content) };
   },
   async push(v, env, etag) {
     const body = JSON.stringify({ description: 'NodeSeek 助手同步数据', files: { [SYNC_FILE]: { content: JSON.stringify(env) } } });
     if (!v.gistId) {
-      const r = await http('POST', GIST_API, { ...ghHeaders(v), 'Content-Type': 'application/json' }, JSON.stringify({ public: false, ...JSON.parse(body) }));
+      const r = await http('POST', GIST_API, { cors: true, headers: { ...ghHeaders(v), 'Content-Type': 'application/json' }, body: JSON.stringify({ public: false, ...JSON.parse(body) }) });
       if (r.status !== 201) fail(r, '创建 Gist 失败');
       const g = JSON.parse(r.text) as { id: string; history: { version: string }[] };
       v.gistId = g.id;
@@ -232,11 +276,11 @@ const gist: SyncProvider = {
     }
     // Gist 不支持条件写：写前读一次版本号比对
     if (etag) {
-      const cur = await http('GET', `${GIST_API}/${v.gistId}`, ghHeaders(v));
+      const cur = await http('GET', `${GIST_API}/${v.gistId}`, { cors: true, headers: ghHeaders(v) });
       const ver = (JSON.parse(cur.text) as { history?: { version: string }[] }).history?.[0]?.version;
       if (ver && ver !== etag) throw new ConflictError();
     }
-    const r = await http('PATCH', `${GIST_API}/${v.gistId}`, { ...ghHeaders(v), 'Content-Type': 'application/json' }, body);
+    const r = await http('PATCH', `${GIST_API}/${v.gistId}`, { cors: true, headers: { ...ghHeaders(v), 'Content-Type': 'application/json' }, body });
     if (r.status !== 200) fail(r, '推送失败');
     return (JSON.parse(r.text) as { history: { version: string }[] }).history[0].version;
   },
@@ -263,7 +307,7 @@ export interface DeviceCode {
 
 /** 第一步：申请设备代码，用户在 microsoft.com/devicelogin 输入 */
 export async function onedriveStartLogin(clientId: string): Promise<DeviceCode> {
-  const r = await http('POST', `${MS_AUTH}/devicecode`, { 'Content-Type': 'application/x-www-form-urlencoded' }, new URLSearchParams({ client_id: clientId, scope: MS_SCOPE }).toString());
+  const r = await http('POST', `${MS_AUTH}/devicecode`, { headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ client_id: clientId, scope: MS_SCOPE }).toString() });
   const j = JSON.parse(r.text) as { user_code: string; verification_uri: string; device_code: string; interval: number; expires_in: number; error_description?: string };
   if (r.status !== 200) throw new Error(j.error_description?.split('\n')[0] || `HTTP ${r.status}`);
   return { userCode: j.user_code, verificationUri: j.verification_uri, deviceCode: j.device_code, interval: j.interval, expiresAt: Date.now() + j.expires_in * 1000 };
@@ -274,7 +318,7 @@ export async function onedrivePollLogin(clientId: string, dc: DeviceCode, signal
   while (Date.now() < dc.expiresAt) {
     if (signal.aborted) throw new Error('已取消');
     await new Promise((res) => setTimeout(res, dc.interval * 1000));
-    const r = await http('POST', `${MS_AUTH}/token`, { 'Content-Type': 'application/x-www-form-urlencoded' }, new URLSearchParams({ grant_type: 'urn:ietf:params:oauth:grant-type:device_code', client_id: clientId, device_code: dc.deviceCode }).toString());
+    const r = await http('POST', `${MS_AUTH}/token`, { headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ grant_type: 'urn:ietf:params:oauth:grant-type:device_code', client_id: clientId, device_code: dc.deviceCode }).toString() });
     const j = JSON.parse(r.text) as { refresh_token?: string; error?: string; error_description?: string };
     if (j.refresh_token) return j.refresh_token;
     if (j.error === 'authorization_pending') continue;
@@ -292,7 +336,7 @@ let msToken: { value: string; exp: number; refresh: string } | null = null;
 async function msAccessToken(v: Values): Promise<string> {
   if (msToken && msToken.refresh === v.refreshToken && msToken.exp > Date.now() + 60_000) return msToken.value;
   if (!v.refreshToken) throw new Error('请先点击「登录 OneDrive」');
-  const r = await http('POST', `${MS_AUTH}/token`, { 'Content-Type': 'application/x-www-form-urlencoded' }, new URLSearchParams({ grant_type: 'refresh_token', client_id: v.clientId, refresh_token: v.refreshToken, scope: MS_SCOPE }).toString());
+  const r = await http('POST', `${MS_AUTH}/token`, { headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ grant_type: 'refresh_token', client_id: v.clientId, refresh_token: v.refreshToken, scope: MS_SCOPE }).toString() });
   const j = JSON.parse(r.text) as { access_token?: string; refresh_token?: string; expires_in?: number; error_description?: string };
   if (!j.access_token) throw new Error(`OneDrive 登录已失效，请重新登录（${j.error_description?.split('\n')[0] ?? r.status}）`);
   // 微软会轮换 refresh token，交给引擎回写到配置
@@ -317,19 +361,19 @@ const onedrive: SyncProvider = {
   ],
   async pull(v, etag) {
     const auth = { Authorization: `Bearer ${await msAccessToken(v)}` };
-    const meta = await http('GET', `${GRAPH_FILE}?select=eTag`, auth);
+    const meta = await http('GET', `${GRAPH_FILE}?select=eTag`, { headers: auth });
     if (meta.status === 404) return { status: 'empty' };
     if (meta.status !== 200) fail(meta, '拉取失败');
     const tag = (JSON.parse(meta.text) as { eTag: string }).eTag;
     if (etag && tag === etag) return { status: 'notModified', etag };
-    const r = await http('GET', `${GRAPH_FILE}:/content`, auth);
+    const r = await http('GET', `${GRAPH_FILE}:/content`, { headers: auth });
     if (r.status !== 200) fail(r, '下载失败');
     return { status: 'ok', etag: tag, envelope: parseEnvelope(r.text) };
   },
   async push(v, env, etag) {
     const headers: Record<string, string> = { Authorization: `Bearer ${await msAccessToken(v)}`, 'Content-Type': 'application/json' };
     if (etag) headers['If-Match'] = etag;
-    const r = await http('PUT', `${GRAPH_FILE}:/content${etag ? '' : '?@microsoft.graph.conflictBehavior=fail'}`, headers, JSON.stringify(env));
+    const r = await http('PUT', `${GRAPH_FILE}:/content${etag ? '' : '?@microsoft.graph.conflictBehavior=fail'}`, { headers, body: JSON.stringify(env) });
     if (r.status === 412 || r.status === 409) throw new ConflictError();
     if (r.status >= 300) fail(r, '上传失败');
     return (JSON.parse(r.text) as { eTag: string }).eTag;

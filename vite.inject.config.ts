@@ -33,7 +33,7 @@ export default defineConfig({
   resolve: {
     alias: { $: fileURLToPath(new URL('./src/platform/web.ts', import.meta.url)) },
   },
-  define: { 'process.env.NODE_ENV': '"production"', __NSH_VERSION__: JSON.stringify(VERSION), __NSH_DEBUG_REPORT__: JSON.stringify(DEBUG_REPORT) },
+  define: { 'process.env.NODE_ENV': '"production"', __NSH_VERSION__: JSON.stringify(VERSION), __NSH_DEBUG_REPORT__: JSON.stringify(DEBUG_REPORT), __NSH_WEB__: 'true' },
   build: {
     emptyOutDir: false,
     cssCodeSplit: false,

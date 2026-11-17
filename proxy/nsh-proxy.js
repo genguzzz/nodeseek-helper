@@ -5,7 +5,8 @@
  * 三种用途，由请求路径区分：
  *   1. 站点 HTML 响应：在 </head> 前注入 <script defer src="/__nsh/app.js">
  *   2. /__nsh/app.js：从发布地址拉取注入版脚本并以同源 JS 返回
- *   3. /__nsh/relay：把页面里的图床上传请求转发到真实地址（绕开浏览器 CORS）
+ *   3. /__nsh/relay：把页面里不支持跨域的请求（图床上传、WebDAV 等）转发到真实地址；
+ *      允许跨域的服务（自建同步、Gist）由页面直接请求，避免长轮询长时间占用代理工具的脚本执行
  */
 const NSH_BASE = '__NSH_BASE__';
 const NSH_VERSION = '__NSH_VERSION__';
@@ -99,8 +100,8 @@ async function relay() {
     const body = method === 'GET' || method === 'HEAD' ? undefined : requestBody();
     const res = await http({ url: target, method, headers, body, binary });
     const out = { 'Content-Type': headerOf(res.headers, 'Content-Type') || 'application/json', 'X-NSH-Relay': '1', 'Cache-Control': 'no-store' };
-    // 同步协议依赖的版本头与口令锁状态原样透传
-    for (const h of ['ETag', 'X-Updated-At', 'Last-Modified', 'X-NSH-Locked']) {
+    // WebDAV / OneDrive 同步依赖的版本头原样透传（自建同步服务与 Gist 允许跨域，页面直接请求，不经中转）
+    for (const h of ['ETag', 'Last-Modified']) {
       const v = headerOf(res.headers, h);
       if (v) out[h] = v;
     }

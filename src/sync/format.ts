@@ -251,10 +251,22 @@ export function stampNew(doc: SyncDocument, meta: SyncMeta, now: number): void {
   }
 }
 
-/** 文档内容摘要（忽略 updatedAt / device），用于判断合并后是否需要回写 */
+/** 对象键按字典序重排（数组保持顺序），使摘要只取决于内容、与键的插入顺序无关 */
+function canonical(v: unknown): unknown {
+  if (Array.isArray(v)) return v.map(canonical);
+  if (!v || typeof v !== 'object') return v;
+  const o = v as Record<string, unknown>;
+  return Object.fromEntries(Object.keys(o).sort().map((k) => [k, canonical(o[k])]));
+}
+
+/**
+ * 文档内容摘要（忽略 updatedAt / device），用于判断合并后是否需要回写。
+ * 必须与键顺序无关：合并结果与云端文档内容相同但条目顺序不同时，若判为「有变化」，
+ * 每次拉到新版本都会回写一次，两台设备的实时同步会互相触发、无限往返。
+ */
 export function docHash(doc: SyncDocument): string {
   const { updatedAt: _u, device: _d, ...rest } = doc;
-  return hash(rest);
+  return hash(canonical(rest));
 }
 
 /* ---------------- 应用到本地 ---------------- */

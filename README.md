@@ -220,7 +220,7 @@ npm run typecheck
 
 - 基于 [vite-plugin-monkey](https://github.com/lisonge/vite-plugin-monkey) + Vue 3 + TypeScript。
 - 开发模式下，油猴里安装的只是加载器（`/nsh-dev.user.js`），代码从本地 dev server 动态加载并热更新；dev server 重启、配置变化都无需重装。详见 [docs/dev.md](docs/dev.md)。
-- 代理版构建（`vite.inject.config.ts`）把 `$`（GM API）替换为 `src/platform/web.ts`：存储用 localStorage，跨域请求经同源 `/__nsh/relay` 交给代理脚本转发。
+- 代理版构建（`vite.inject.config.ts`）把 `$`（GM API）替换为 `src/platform/web.ts`：存储用 localStorage；允许跨域的服务（自建同步、Gist）由页面直接请求，其余跨域请求（图床上传、WebDAV 等）经同源 `/__nsh/relay` 交给代理脚本转发。注入标签带 `defer`，不阻塞页面解析；Cloudflare 质询页与非 200 页面不注入。
 - 本地无登录态调试：`node dev/mock-server.mjs` 后打开
   - `http://localhost:5299/dev/mock.html`：模拟编辑器 + 模拟 ImgBed（认证码 `test-code`）
   - `http://localhost:5299/dev/proxied.html`：页面与 `/__nsh/*` 经真实的 `dist/nsh-proxy.js` 处理（`dev/proxy-sim.mjs` 模拟 Surge；`NSH_SIM=qx` 模拟 Quantumult X）。构建时设 `NSH_PUBLISH_BASE=http://localhost:5299/dist`。

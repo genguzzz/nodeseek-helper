@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { settings, stickerData, type Sticker } from '../src/core/store';
-import { applyDoc, buildLocalDoc, iconFromSync, iconToSync, mergeDocs, stampNew, type SyncDocument, type SyncMeta } from '../src/sync/format';
+import { applyDoc, buildLocalDoc, docHash, iconFromSync, iconToSync, mergeDocs, stampNew, type SyncDocument, type SyncMeta } from '../src/sync/format';
 import { open, PassphraseError, seal } from '../src/sync/crypto';
 
 const sticker = (id: string, extra: Partial<Sticker> = {}): Sticker => ({
@@ -197,5 +197,22 @@ describe('口令锁的密钥标识', () => {
     expect(await keyId('pass-2', 'token-a')).not.toBe(a);
     expect(await keyId('pass-1', 'token-b')).not.toBe(a);
     expect(a).not.toContain(Buffer.from('pass-1').toString('hex'));
+  });
+});
+
+describe('文档摘要', () => {
+  it('内容相同、条目键顺序不同：摘要相同（否则拉到新版本后会无谓回写，两台设备互相触发无限往返）', () => {
+    resetLocal([sticker('a'), sticker('b'), sticker('c')]);
+    const doc = buildLocalDoc({}, 'dev1', 1000);
+    const reordered: SyncDocument = { ...doc, updatedAt: 2000, device: 'dev2', stickers: Object.fromEntries(Object.entries(doc.stickers).reverse()) };
+    expect(Object.keys(reordered.stickers)).not.toEqual(Object.keys(doc.stickers));
+    expect(docHash(reordered)).toBe(docHash(doc));
+  });
+
+  it('数组顺序（分组 / 表情排序）不同：摘要不同', () => {
+    resetLocal([sticker('a'), sticker('b')]);
+    const doc = buildLocalDoc({}, 'dev1', 1000);
+    const moved: SyncDocument = { ...doc, order: { ...doc.order, stickers: { ...doc.order.stickers, v: [...doc.order.stickers.v].reverse() } } };
+    expect(docHash(moved)).not.toBe(docHash(doc));
   });
 });

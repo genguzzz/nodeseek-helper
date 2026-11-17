@@ -27,3 +27,6 @@ declare const __NSH_VERSION__: string;
 
 /** 调试构建的性能日志上报地址；正式构建为空字符串 */
 declare const __NSH_DEBUG_REPORT__: string;
+
+/** 构建目标：true 为代理工具注入版（`$` = platform/web.ts，原生 XHR + 同源中转），false 为油猴脚本 */
+declare const __NSH_WEB__: boolean;
