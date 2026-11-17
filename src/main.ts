@@ -11,6 +11,7 @@ import { collectSticker } from './core/collect';
 import { startAutoSync } from './sync/engine';
 import { loadOfficialStickers } from './core/official';
 import { openPanel } from './core/ui';
+import { phase, startDebugReport } from './debug/report';
 
 function mountApp(): void {
   const host = document.createElement('div');
@@ -74,12 +75,12 @@ function bindEntryToggles(): void {
 
 /** 依赖 body 的部分在 DOM 就绪后启动 */
 function bootBody(): void {
-  mountApp();
-  injectFastNav();
-  watchEditors();
-  setupCollect();
-  startAutoSync();
-  void loadOfficialStickers();
+  phase('mountApp', mountApp);
+  phase('injectFastNav', injectFastNav);
+  phase('watchEditors', watchEditors);
+  phase('setupCollect', setupCollect);
+  phase('startAutoSync', startAutoSync);
+  phase('loadOfficialStickers', () => void loadOfficialStickers());
   GM_registerMenuCommand('⚙ 打开 NodeSeek 助手', () => openPanel());
   GM_registerMenuCommand('☁ 图床设置', () => openPanel('hosts'));
   GM_registerMenuCommand('☺ 表情包管理', () => openPanel('stickers'));
@@ -90,11 +91,13 @@ function boot(): void {
   // 油猴与代理注入同时启用时只运行一份（DOM 标记在两个环境间共享）
   if (document.documentElement.dataset.nshLoaded) return;
   document.documentElement.dataset.nshLoaded = '1';
+  startDebugReport();
   // 入口开关与顶部图标在首帧前就位
-  bindEntryToggles();
+  phase('bindEntryToggles', bindEntryToggles);
   onHeaderEntryClick(() => openPanel());
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bootBody, { once: true });
-  else bootBody();
+  const run = (): void => phase('bootBody', bootBody);
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', run, { once: true });
+  else run();
 }
 
 boot();

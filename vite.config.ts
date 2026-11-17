@@ -6,6 +6,9 @@ import { nshDevLoader } from './dev/dev-loader';
 import { presetConnectHosts } from './dev/presets';
 
 const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8')) as { version: string };
+// 调试构建：NSH_VERSION_SUFFIX（如 -debug.12）区分版本，NSH_DEBUG_REPORT 为性能日志上报地址；正式构建两者为空，调试代码被整体移除
+const VERSION = pkg.version + (process.env.NSH_VERSION_SUFFIX ?? '');
+const DEBUG_REPORT = process.env.NSH_DEBUG_REPORT ?? '';
 /** 发布地址（dist 的公开 URL），设置后写入 @updateURL / @downloadURL，油猴可自动更新 */
 const publishBase = process.env.NSH_PUBLISH_BASE?.replace(/\/+$/, '');
 const MATCHES = ['https://www.nodeseek.com/*', 'https://nodeseek.com/*', 'https://www.deepflood.com/*', 'https://deepflood.com/*'];
@@ -14,7 +17,7 @@ const MATCHES = ['https://www.nodeseek.com/*', 'https://nodeseek.com/*', 'https:
 // 构建：npm run build 产出 dist/ 下的油猴脚本与各代理工具模块
 
 export default defineConfig({
-  define: { __NSH_VERSION__: JSON.stringify(pkg.version) },
+  define: { __NSH_VERSION__: JSON.stringify(VERSION), __NSH_DEBUG_REPORT__: JSON.stringify(DEBUG_REPORT) },
   // 压缩脚本本体，缩短下载与解析时间（UserScript 头部由插件单独保留）
   build: { minify: 'esbuild' },
   plugins: [
@@ -26,7 +29,7 @@ export default defineConfig({
       userscript: {
         name: 'NodeSeek 助手',
         namespace: 'https://github.com/genguzzz/nodeseek-helper',
-        version: pkg.version,
+        version: VERSION,
         ...(publishBase
           ? {
               updateURL: `${publishBase}/nodeseek-helper.user.js`,

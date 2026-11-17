@@ -4,6 +4,9 @@ import { fileURLToPath } from 'node:url';
 import fs from 'node:fs';
 
 const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8')) as { version: string };
+// 调试构建：NSH_VERSION_SUFFIX（如 -debug.12）区分版本，NSH_DEBUG_REPORT 为性能日志上报地址；正式构建两者为空，调试代码被整体移除
+const VERSION = pkg.version + (process.env.NSH_VERSION_SUFFIX ?? '');
+const DEBUG_REPORT = process.env.NSH_DEBUG_REPORT ?? '';
 
 /** 把抽出的 CSS 内联进 JS（注入版只有一个文件） */
 function inlineCss(): Plugin {
@@ -30,7 +33,7 @@ export default defineConfig({
   resolve: {
     alias: { $: fileURLToPath(new URL('./src/platform/web.ts', import.meta.url)) },
   },
-  define: { 'process.env.NODE_ENV': '"production"', __NSH_VERSION__: JSON.stringify(pkg.version) },
+  define: { 'process.env.NODE_ENV': '"production"', __NSH_VERSION__: JSON.stringify(VERSION), __NSH_DEBUG_REPORT__: JSON.stringify(DEBUG_REPORT) },
   build: {
     emptyOutDir: false,
     cssCodeSplit: false,

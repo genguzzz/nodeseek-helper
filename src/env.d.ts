@@ -24,3 +24,6 @@ declare module 'gifenc' {
 
 /** 构建时注入的版本号（package.json） */
 declare const __NSH_VERSION__: string;
+
+/** 调试构建的性能日志上报地址；正式构建为空字符串 */
+declare const __NSH_DEBUG_REPORT__: string;

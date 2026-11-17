@@ -6,6 +6,8 @@
  * - 跨域请求：发往同源的 /__nsh/relay，由代理脚本转发到真实图床，绕开 CORS
  */
 
+import { debugEvent } from '../debug/report';
+
 const STORE_PREFIX = 'nsh:';
 export const RELAY_PATH = '/__nsh/relay';
 
@@ -107,7 +109,10 @@ export function GM_xmlhttpRequest(d: XhrDetails): { abort: () => void } {
   xhr.timeout = d.timeout ?? 0;
   if (d.responseType === 'blob') xhr.responseType = 'blob';
   if (d.upload?.onprogress) xhr.upload.onprogress = d.upload.onprogress;
+  const t0 = performance.now();
   xhr.onload = () => {
+    // 调试：中转请求是否由代理脚本处理（无 X-NSH-Relay 说明漏到了源站，会打到 Cloudflare）
+    if (relay) debugEvent({ k: 'relay', host: d.url.replace(/^https?:\/\/([^/]+).*$/, '$1'), st: xhr.status, viaProxy: !!xhr.getResponseHeader('X-NSH-Relay'), ms: Math.round(performance.now() - t0) });
     // 代理脚本未生效时同源 404 返回的是站点页面，给出明确提示
     if (relay && xhr.status === 404 && !xhr.getResponseHeader('X-NSH-Relay')) {
       d.onerror?.(new Error('中转不可用：请确认代理模块已启用且 MITM 包含 nodeseek.com'));
@@ -116,7 +121,10 @@ export function GM_xmlhttpRequest(d: XhrDetails): { abort: () => void } {
     const isBlob = xhr.responseType === 'blob';
     d.onload?.({ status: xhr.status, responseText: isBlob ? '' : xhr.responseText, response: xhr.response, responseHeaders: xhr.getAllResponseHeaders() });
   };
-  xhr.onerror = (e) => d.onerror?.(e);
+  xhr.onerror = (e) => {
+    if (relay) debugEvent({ k: 'relay', host: d.url.replace(/^https?:\/\/([^/]+).*$/, '$1'), err: 'network', ms: Math.round(performance.now() - t0) });
+    d.onerror?.(e);
+  };
   xhr.ontimeout = (e) => d.ontimeout?.(e);
   xhr.send(d.data ?? null);
   return { abort: () => xhr.abort() };

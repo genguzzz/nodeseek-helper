@@ -1,0 +1,41 @@
+name: Debug build
+
+# 调试构建：仅在调试分支 / 手动触发时运行，产物上传为短期 artifact，不创建 Release、不打 tag。
+# 上报地址与下载地址来自仓库 Secrets（不出现在代码与日志里）。
+on:
+  push:
+    branches: ['debug/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm i -g npm@11.6.2 && npm ci
+      - run: npm run typecheck && npx vitest run
+      - name: 构建调试版
+        env:
+          NSH_DEBUG_REPORT: ${{ secrets.NSH_DEBUG_REPORT }}
+          DL_BASE: ${{ secrets.NSH_DEBUG_DL_BASE }}
+        run: |
+          set -e
+          test -n "$NSH_DEBUG_REPORT" && test -n "$DL_BASE"
+          export NSH_VERSION_SUFFIX="-debug.${GITHUB_RUN_NUMBER}"
+          VERSION="$(node -p "require('./package.json').version")${NSH_VERSION_SUFFIX}"
+          NSH_PUBLISH_BASE="$DL_BASE/$VERSION" NSH_PROXY_BASE="$DL_BASE/$VERSION" npm run build
+          mkdir -p out/$VERSION
+          cp dist/nodeseek-helper.inject.js dist/nsh-proxy.js dist/nodeseek-helper.sgmodule dist/nodeseek-helper.module out/$VERSION/
+          echo "$VERSION" > out/VERSION
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nsh-debug
+          path: out/
+          retention-days: 1

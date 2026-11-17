@@ -10,6 +10,9 @@
 const NSH_BASE = '__NSH_BASE__';
 const NSH_VERSION = '__NSH_VERSION__';
 const APP_FILE = 'nodeseek-helper.inject.js';
+// 调试构建为 true：记录各阶段耗时与 Cloudflare 响应信息，经页面上报（正式构建为 false）
+const NSH_DEBUG = !!'__NSH_DEBUG__';
+const T0 = Date.now();
 
 const isQX = typeof $task !== 'undefined';
 const url = $request.url;
@@ -101,8 +104,10 @@ async function relay() {
       const v = headerOf(res.headers, h);
       if (v) out[h] = v;
     }
+    dbgPush({ k: 'relay', host: target.replace(/^https?:\/\/([^/]+).*$/, '$1'), path: target.replace(/^https?:\/\/[^/]+/, '').split('?')[0].slice(0, 40), m: method, st: res.status });
     respond(res.status, out, res.body);
   } catch (e) {
+    dbgPush({ k: 'relay', host: target.replace(/^https?:\/\/([^/]+).*$/, '$1'), m: method, err: String(e).slice(0, 120) });
     respond(502, { 'Content-Type': 'application/json', 'X-NSH-Relay': '1' }, JSON.stringify({ message: '中转失败：' + String(e) }));
   }
 }
@@ -129,6 +134,33 @@ function storeWrite(key, value) {
   }
 }
 
+/* ---------- 调试：最近事件缓存在代理工具存储里，由下一次注入的页面带出上报（被拦截的页面自己无法上报） ---------- */
+const DBG_KEY = 'nsh_dbg_events';
+
+function dbgPush(ev) {
+  if (!NSH_DEBUG) return;
+  let list = [];
+  try {
+    list = JSON.parse(storeRead(DBG_KEY) || '[]');
+  } catch (e) {
+    list = [];
+  }
+  ev.t = T0;
+  ev.dur = Date.now() - T0;
+  list.push(ev);
+  storeWrite(DBG_KEY, JSON.stringify(list.slice(-60)));
+}
+
+function dbgDrain() {
+  const raw = storeRead(DBG_KEY);
+  storeWrite(DBG_KEY, '[]');
+  try {
+    return JSON.parse(raw || '[]');
+  } catch (e) {
+    return [];
+  }
+}
+
 function sendApp(body, source) {
   // 地址带 ?v=版本号，内容随版本不变：浏览器可长期缓存，后续页面打开不再经过代理
   respond(200, {
@@ -139,14 +171,25 @@ function sendApp(body, source) {
   }, body);
 }
 
+/** 调试：脚本开头记录来源与「开始执行」时刻，页面据此算出下载与解析执行耗时 */
+function dbgAppPrefix(source, fetchMs) {
+  if (!NSH_DEBUG) return '';
+  return `window.__nshApp={src:${JSON.stringify(source)},fetch:${fetchMs},proxyMs:${Date.now() - T0},at:Date.now(),evalStart:performance.now()};\n`;
+}
+
 async function serveApp() {
   const cached = storeRead(CACHE_VER_KEY) === NSH_VERSION ? storeRead(CACHE_KEY) : null;
-  if (cached) return sendApp(cached, 'cache');
+  if (cached) {
+    dbgPush({ k: 'app', src: 'cache', kb: Math.round(cached.length / 1024) });
+    return sendApp(dbgAppPrefix('cache', 0) + cached, 'cache');
+  }
   try {
+    const t = Date.now();
     const res = await http({ url: `${NSH_BASE}/${APP_FILE}?v=${NSH_VERSION}`, method: 'GET', headers: {} });
     if (res.status >= 400 || !res.body) throw new Error('HTTP ' + res.status);
     if (storeWrite(CACHE_KEY, res.body)) storeWrite(CACHE_VER_KEY, NSH_VERSION);
-    sendApp(res.body, 'network');
+    dbgPush({ k: 'app', src: 'network', fetch: Date.now() - t, kb: Math.round(res.body.length / 1024) });
+    sendApp(dbgAppPrefix('network', Date.now() - t) + res.body, 'network');
   } catch (e) {
     // 新版本下载失败时退回旧缓存，保证功能可用
     const stale = storeRead(CACHE_KEY);
@@ -158,11 +201,31 @@ async function serveApp() {
 function injectHtml() {
   const ct = headerOf($response.headers, 'Content-Type') || '';
   const body = $response.body;
+  // Surge / Loon 为数字，Quantumult X 为 "HTTP/1.1 200 OK" 字符串
+  const m = String($response.status || $response.statusCode || 200).match(/\d{3}/);
+  const status = m ? Number(m[0]) : 200;
+  const cf = {
+    st: status,
+    ray: headerOf($response.headers, 'cf-ray'),
+    mit: headerOf($response.headers, 'cf-mitigated'),
+    stm: headerOf($response.headers, 'server-timing'),
+    cache: headerOf($response.headers, 'cf-cache-status'),
+  };
+  // Cloudflare 质询 / 拦截页（非 200 或带 cf-mitigated）不注入：脚本在那里无用，还可能干扰验证
+  if (status !== 200 || cf.mit) {
+    dbgPush({ k: 'skip', path, kb: typeof body === 'string' ? Math.round(body.length / 1024) : 0, cf });
+    return $done({});
+  }
   if (!/text\/html/i.test(ct) || typeof body !== 'string' || body.indexOf('</head>') < 0 || body.indexOf('/__nsh/app.js') >= 0) {
     return $done({});
   }
   // defer：不阻塞页面解析与首帧绘制，解析完成后、DOMContentLoaded 之前执行
-  const tag = `<script defer src="/__nsh/app.js?v=${NSH_VERSION}"></script>`;
+  let tag = `<script defer src="/__nsh/app.js?v=${NSH_VERSION}"></script>`;
+  if (NSH_DEBUG) {
+    // 代理脚本在手机上运行，Date.now() 与页面同一时钟：可对照导航时间线看出 Surge 在哪个时刻处理了响应
+    const info = { path, at: T0, dur: Date.now() - T0, kb: Math.round(body.length / 1024), cf, events: dbgDrain() };
+    tag = `<script>window.__nshProxy=${JSON.stringify(info).replace(/</g, '\\u003c')}</script>` + tag;
+  }
   const i = body.indexOf('</head>');
   const headers = Object.assign({}, $response.headers);
   // 若站点日后加了 CSP，去掉以保证注入脚本可执行

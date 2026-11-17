@@ -11,7 +11,9 @@ const PLACEHOLDER = 'https://cdn.jsdelivr.net/gh/<github-user>/nodeseek-helper@m
 // 代理模块固定指向本版本的发布地址（NSH_PROXY_BASE，如 releases/download/v1.2.3），避免 latest 跳转被缓存导致新旧混用；
 // 油猴脚本的自动更新地址仍用 NSH_PUBLISH_BASE（latest）
 const base = (process.env.NSH_PROXY_BASE || process.env.NSH_PUBLISH_BASE || PLACEHOLDER).replace(/\/+$/, '');
-const version = pkg.version;
+const version = pkg.version + (process.env.NSH_VERSION_SUFFIX ?? '');
+// 调试构建：代理脚本记录各阶段耗时与 Cloudflare 响应信息，交给页面一并上报
+const debug = process.env.NSH_DEBUG_REPORT ? '1' : '';
 const script = `${base}/nsh-proxy.js`;
 
 // 只解密 www 站点：裸域名只做 301 跳转到 www，无需 MITM，缩小影响面
@@ -27,7 +29,8 @@ const outputs = {
   'nsh-proxy.js': fs
     .readFileSync(path.join(root, 'proxy/nsh-proxy.js'), 'utf8')
     .replaceAll('__NSH_BASE__', base)
-    .replaceAll('__NSH_VERSION__', version),
+    .replaceAll('__NSH_VERSION__', version)
+    .replaceAll('__NSH_DEBUG__', debug),
 
   'nodeseek-helper.sgmodule': `#!name=${NAME}
 #!desc=${DESC} v${version}
