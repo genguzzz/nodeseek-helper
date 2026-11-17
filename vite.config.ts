@@ -1,6 +1,6 @@
 import { defineConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
-import monkey from 'vite-plugin-monkey';
+import monkey, { cdn } from 'vite-plugin-monkey';
 import fs from 'node:fs';
 import { nshDevLoader } from './dev/dev-loader';
 import { presetConnectHosts } from './dev/presets';
@@ -59,8 +59,8 @@ export default defineConfig({
       server: { mountGmApi: false },
       build: {
         fileName: 'nodeseek-helper.user.js',
-        // Vue 打包进脚本（tree-shaking 后只保留用到的运行时）：单文件、无外部 CDN 依赖，
-        // 比 @require 完整版 vue.global.prod.js（含模板编译器，约 170 KB）小得多
+        // Vue 走 @require CDN：油猴本地缓存该文件，脚本本体保持小巧
+        externalGlobals: { vue: cdn.jsdelivr('Vue', 'dist/vue.global.prod.js') },
       },
     }),
   ],
