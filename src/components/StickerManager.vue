@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import { GM_setClipboard } from '$';
 import { DEFAULT_GROUP_ID, exportStickers, seedBuiltinPacks, stickerData, uid, type Sticker, type StickerGroup } from '../core/store';
 import { toast } from '../core/ui';
 import StickerThumb from './StickerThumb.vue';
 import GroupIcon from './GroupIcon.vue';
 import ImportDialog from './ImportDialog.vue';
+import GroupIconDialog from './GroupIconDialog.vue';
 
 /** 触摸设备上关闭 HTML5 拖拽排序：iOS 上 draggable 元素长按会进入拖拽，干扰列表滑动 */
 const pointerDrag: boolean = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
@@ -64,11 +65,23 @@ function commitRenameGroup(g: StickerGroup, e: Event): void {
   renamingGroup.value = '';
 }
 
-function setGroupIcon(g: StickerGroup): void {
-  const v = prompt('分组图标：emoji、图片链接（https:// 或 data:image/…）或 <svg> 代码，留空恢复默认', g.icon ?? '');
-  if (v === null) return;
-  g.icon = v.trim() || undefined;
+/** 正在编辑图标的分组（面板内对话框，替代原生 prompt：后者在 iOS 上会弹出整段 SVG 代码） */
+const iconGroup = ref<StickerGroup | null>(null);
+
+/** 点分组图标：鼠标设备直接编辑图标；触屏只当作选中分组（避免误触），编辑走「图标」按钮 */
+function onGroupIconClick(e: Event, g: StickerGroup): void {
+  if (!pointerDrag) return;
+  e.stopPropagation();
+  iconGroup.value = g;
 }
+
+/** iOS 点击空白处不会让输入框失焦：在面板任意处按下时结束正在进行的重命名（失焦即保存） */
+function blurInlineInput(e: Event): void {
+  const a = document.activeElement as HTMLElement | null;
+  if (a?.classList.contains('nsh-inline-input') && !a.contains(e.target as Node)) a.blur();
+}
+onMounted(() => document.addEventListener('pointerdown', blurInlineInput, true));
+onBeforeUnmount(() => document.removeEventListener('pointerdown', blurInlineInput, true));
 
 function deleteGroup(g: StickerGroup): void {
   const n = countOf(g.id);
@@ -256,7 +269,7 @@ const defaultImportGroup = computed(() => (currentGroup.value ? currentGroup.val
         @dragleave="dragOver = ''"
         @drop.prevent="onGroupDrop($event, g)"
       >
-        <span class="nsh-icon nsh-clickable" title="设置图标" @click.stop="setGroupIcon(g)"><GroupIcon :group="g" fallback /></span>
+        <span class="nsh-icon" :class="{ 'nsh-clickable': pointerDrag }" :title="pointerDrag ? '设置图标' : undefined" @click="onGroupIconClick($event, g)"><GroupIcon :group="g" fallback /></span>
         <input
           v-if="renamingGroup === g.id"
           class="nsh-input nsh-inline-input"
@@ -269,6 +282,7 @@ const defaultImportGroup = computed(() => (currentGroup.value ? currentGroup.val
         <span v-else class="nsh-sm-nav-name" @dblclick.stop="renamingGroup = g.id">{{ g.name }}</span>
         <span class="nsh-count">{{ countOf(g.id) }}</span>
         <span v-if="renamingGroup !== g.id" class="nsh-sm-nav-ops">
+          <button title="设置图标" @click.stop="iconGroup = g">☺</button>
           <button title="重命名" @click.stop="renamingGroup = g.id">✎</button>
           <button v-if="g.id !== 'default'" title="删除分组" @click.stop="deleteGroup(g)">✕</button>
         </span>
@@ -371,6 +385,7 @@ const defaultImportGroup = computed(() => (currentGroup.value ? currentGroup.val
     </section>
 
     <ImportDialog v-if="importing" :default-group="defaultImportGroup" @close="importing = false" @done="(gid: string) => (view = gid)" />
+    <GroupIconDialog v-if="iconGroup" :group="iconGroup" @close="iconGroup = null" />
   </div>
 </template>
 
