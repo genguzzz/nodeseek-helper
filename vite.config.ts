@@ -40,7 +40,8 @@ export default defineConfig({
         icon: 'https://www.nodeseek.com/static/image/favicon/android-chrome-192x192.png',
         match: MATCHES,
         connect: [...presetConnectHosts(), '*'],
-        'run-at': 'document-start',
+        // document-end：在 DOMContentLoaded 时运行，不在首帧前同步执行 Vue 与脚本本体
+        'run-at': 'document-end',
         grant: [
           'GM_xmlhttpRequest',
           'GM_getValue',

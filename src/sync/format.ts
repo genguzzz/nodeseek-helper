@@ -50,7 +50,7 @@ export const SYNCED_SETTING_KEYS = [
   'showUploadButton',
   'showStickerButton',
   'showFastNav',
-  'showHeaderEntry',
+  'showHeaderIcon',
   'officialFav',
   'officialUsage',
   'seededPacks',

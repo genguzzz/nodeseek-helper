@@ -502,17 +502,25 @@ export async function maybeCompress(
   cfg: { compress: boolean; compressFormat: string; compressQuality: number; maxWidth: number },
 ): Promise<File> {
   if (!cfg.compress || !/^image\/(png|jpe?g|webp|bmp)$/.test(file.type)) return file;
-  const bmp = await createImageBitmap(file);
-  const scale = cfg.maxWidth > 0 && bmp.width > cfg.maxWidth ? cfg.maxWidth / bmp.width : 1;
-  const canvas = document.createElement('canvas');
-  canvas.width = Math.round(bmp.width * scale);
-  canvas.height = Math.round(bmp.height * scale);
-  canvas.getContext('2d')?.drawImage(bmp, 0, 0, canvas.width, canvas.height);
-  const type = cfg.compressFormat === 'original' ? file.type : cfg.compressFormat;
-  const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, type, cfg.compressQuality));
-  if (!blob || blob.size >= file.size) return file;
-  const ext = type.split('/')[1].replace('jpeg', 'jpg');
-  return new File([blob], file.name.replace(/\.[^.]+$/, '') + '.' + ext, { type });
+  // 压缩失败（Safari 不支持编码 WebP、超大照片超出 iOS 画布上限等）时直接上传原图，不让上传失败
+  try {
+    const bmp = await createImageBitmap(file);
+    const scale = cfg.maxWidth > 0 && bmp.width > cfg.maxWidth ? cfg.maxWidth / bmp.width : 1;
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(bmp.width * scale);
+    canvas.height = Math.round(bmp.height * scale);
+    canvas.getContext('2d')?.drawImage(bmp, 0, 0, canvas.width, canvas.height);
+    bmp.close?.();
+    const want = cfg.compressFormat === 'original' ? file.type : cfg.compressFormat;
+    const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, want, cfg.compressQuality));
+    if (!blob || !blob.size || blob.size >= file.size) return file;
+    // 以浏览器实际产出的格式为准（Safari 请求 WebP 时会静默返回 PNG）
+    const type = blob.type || want;
+    const ext = type.split('/')[1].replace('jpeg', 'jpg');
+    return new File([blob], file.name.replace(/\.[^.]+$/, '') + '.' + ext, { type });
+  } catch {
+    return file;
+  }
 }
 
 /** 生成一张测试图片，用于「测试上传」 */

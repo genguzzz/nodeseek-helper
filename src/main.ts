@@ -1,5 +1,5 @@
 // 必须最先导入：顶部图标在其他重模块执行之前就开始注入
-import { onHeaderEntryClick } from './header-entry';
+import { onHeaderEntryClick, startHeaderEntry } from './header-entry';
 import { createApp, watchEffect } from 'vue';
 import { GM_registerMenuCommand } from '$';
 import './styles.css';
@@ -67,7 +67,8 @@ function bindEntryToggles(): void {
     c.toggle('nsh-hide-upload', !settings.showUploadButton);
     c.toggle('nsh-hide-sticker', !settings.showStickerButton);
     c.toggle('nsh-hide-fastnav', !settings.showFastNav);
-    c.toggle('nsh-hide-header', !settings.showHeaderEntry);
+    c.toggle('nsh-hide-header', !settings.showHeaderIcon);
+    if (settings.showHeaderIcon) startHeaderEntry();
   });
 }
 

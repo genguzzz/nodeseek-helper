@@ -30,7 +30,7 @@ export interface Settings {
   showUploadButton: boolean;
   showStickerButton: boolean;
   showFastNav: boolean;
-  showHeaderEntry: boolean;
+  showHeaderIcon: boolean;
   /** 官方表情的收藏（转义码列表）与使用记录 */
   officialFav: string[];
   officialUsage: Record<string, { c: number; t: number }>;
@@ -103,7 +103,7 @@ const defaultSettings = (): Settings => ({
   showUploadButton: true,
   showStickerButton: true,
   showFastNav: true,
-  showHeaderEntry: true,
+  showHeaderIcon: false,
   officialFav: [],
   officialUsage: {},
   hoverPreview: true,

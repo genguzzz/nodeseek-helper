@@ -118,9 +118,15 @@ function watchHead(): void {
   if (head) new MutationObserver(() => place()).observe(head, { childList: true, subtree: true });
 }
 
-function start(): void {
-  // 设置里关闭了顶部图标时不插入，避免先出现再被隐藏
-  if (GM_getValue<{ showHeaderEntry?: boolean } | undefined>('nsh_settings_v1', undefined)?.showHeaderEntry === false) return;
+let started = false;
+
+/**
+ * 开始放置入口（只执行一次）。默认关闭：部分安卓浏览器导航栏很窄，多一个图标会把站点 Logo 文字挤到下一行、压住分类栏；
+ * 设置里打开「顶部导航图标」后由主模块调用；导入时已打开则立即调用（避免先出现再被隐藏）。
+ */
+export function startHeaderEntry(): void {
+  if (started) return;
+  started = true;
   place();
   let loaded = false;
   // 导航栏（含铃铛）一解析出来就放好；页面加载完之后放好即停止监听整个文档
@@ -143,4 +149,4 @@ function start(): void {
   else window.addEventListener('load', finish, { once: true });
 }
 
-start();
+if (GM_getValue<{ showHeaderIcon?: boolean } | undefined>('nsh_settings_v1', undefined)?.showHeaderIcon === true) startHeaderEntry();

@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const HEADER = '<header><div id="nsk-head" class="nsk-container"><form class="search-box"></form><div class="color-theme-switcher"><svg></svg></div></div></header>';
 
@@ -6,6 +6,11 @@ async function load(): Promise<typeof import('../src/header-entry')> {
   vi.resetModules();
   return import('../src/header-entry');
 }
+
+/** 打开顶部图标设置（默认关闭） */
+const enable = (): void => localStorage.setItem('nsh:nsh_settings_v1', JSON.stringify({ showHeaderIcon: true }));
+
+beforeEach(enable);
 
 afterEach(() => {
   document.body.innerHTML = '';
@@ -36,13 +41,20 @@ describe('顶部导航入口', () => {
     expect(document.querySelector('.nsh-head-entry')).not.toBeNull();
   });
 
-  it('设置里关闭了顶部图标：不插入，也不会重复插入', async () => {
-    localStorage.setItem('nsh:nsh_settings_v1', JSON.stringify({ showHeaderEntry: false }));
-    document.body.innerHTML = HEADER;
-    await load();
-    expect(document.querySelector('.nsh-head-entry')).toBeNull();
-
+  it('默认关闭：没有设置或设置为关闭时都不插入；运行中再打开会插入，且不会重复插入', async () => {
     localStorage.clear();
+    document.body.innerHTML = HEADER;
+    let mod = await load();
+    expect(document.querySelector('.nsh-head-entry')).toBeNull();
+    localStorage.setItem('nsh:nsh_settings_v1', JSON.stringify({ showHeaderIcon: false }));
+    mod = await load();
+    expect(document.querySelector('.nsh-head-entry')).toBeNull();
+    mod.startHeaderEntry();
+    mod.startHeaderEntry();
+    expect(document.querySelectorAll('.nsh-head-entry')).toHaveLength(1);
+
+    document.querySelector('.nsh-head-entry')?.remove();
+    enable();
     await load();
     await load();
     expect(document.querySelectorAll('.nsh-head-entry')).toHaveLength(1);

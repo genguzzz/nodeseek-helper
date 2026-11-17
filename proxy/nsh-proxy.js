@@ -3,7 +3,7 @@
  * 版本 __NSH_VERSION__
  *
  * 三种用途，由请求路径区分：
- *   1. 站点 HTML 响应：在 </body> 前注入 <script src="/__nsh/app.js">
+ *   1. 站点 HTML 响应：在 </head> 前注入 <script defer src="/__nsh/app.js">
  *   2. /__nsh/app.js：从发布地址拉取注入版脚本并以同源 JS 返回
  *   3. /__nsh/relay：把页面里的图床上传请求转发到真实地址（绕开浏览器 CORS）
  */
@@ -161,8 +161,8 @@ function injectHtml() {
   if (!/text\/html/i.test(ct) || typeof body !== 'string' || body.indexOf('</head>') < 0 || body.indexOf('/__nsh/app.js') >= 0) {
     return $done({});
   }
-  // 放在 <head> 里同步执行：脚本先于页面主体运行，顶部图标等能在首帧前就位
-  const tag = `<script src="/__nsh/app.js?v=${NSH_VERSION}"></script>`;
+  // defer：不阻塞页面解析与首帧绘制，解析完成后、DOMContentLoaded 之前执行
+  const tag = `<script defer src="/__nsh/app.js?v=${NSH_VERSION}"></script>`;
   const i = body.indexOf('</head>');
   const headers = Object.assign({}, $response.headers);
   // 若站点日后加了 CSP，去掉以保证注入脚本可执行

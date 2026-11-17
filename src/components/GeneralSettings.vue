@@ -70,12 +70,12 @@ type BoolKey =
   | 'showUploadButton'
   | 'showStickerButton'
   | 'showFastNav'
-  | 'showHeaderEntry';
+  | 'showHeaderIcon';
 const entryToggles: { key: BoolKey; label: string; help: string }[] = [
   { key: 'showUploadButton', label: '上传图片按钮', help: '编辑器工具栏与右上角的「云朵上传」按钮；关闭后仍可粘贴 / 拖拽上传' },
   { key: 'showStickerButton', label: '表情入口', help: '编辑器工具栏的笑脸按钮（工具栏隐藏时显示在右上角），以及底部原生表情栏前的收藏 / 最近 / 自定义分组' },
   { key: 'showFastNav', label: '右下角助手按钮', help: '回到顶部按钮上方的「助手」快捷菜单' },
-  { key: 'showHeaderEntry', label: '顶部导航图标', help: '导航栏主题切换旁的笑脸贴纸图标' },
+  { key: 'showHeaderIcon', label: '顶部导航图标', help: '导航栏里的笑脸贴纸图标；默认关闭，窄屏手机上可能挤压站点 Logo' },
 ];
 const toggles: { key: BoolKey; label: string; help: string }[] = [
   { key: 'pasteUpload', label: '粘贴图片自动上传', help: '在回复 / 发帖编辑器中 Ctrl+V 截图或图片时自动上传并插入' },

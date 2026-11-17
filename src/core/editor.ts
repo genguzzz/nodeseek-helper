@@ -28,7 +28,14 @@ function pickFiles(cm: CM): void {
   input.type = 'file';
   input.accept = 'image/*';
   input.multiple = true;
-  input.onchange = () => void uploadMany(cm, imageFilesOf(input.files));
+  // iOS Safari：未挂到文档上的 file input 可能在相册选择期间被回收，选完图 change 不触发，看起来像「无法上传」
+  input.style.cssText = 'position:fixed;left:-9999px;width:1px;height:1px;opacity:0';
+  document.body.append(input);
+  input.onchange = () => {
+    input.remove();
+    void uploadMany(cm, imageFilesOf(input.files));
+  };
+  input.addEventListener('cancel', () => input.remove());
   input.click();
 }
 
