@@ -34,4 +34,25 @@ export const builtinPacks: BuiltinPack[] = [
       43KwtgzDgaU2C91WXwp4ItBKHjsevHQE.png mRtWtxLeHYXdhM4yXmKAvPAZlkTzHfSl.gif Jrn7JvYVY7dAhQHMrQ0i2ixfaDDvxGYU.png
     `),
   },
+  {
+    // Telegram 贴纸包 bocchi_1_y0ursfunny（孤独摇滚！Vol.1，视频贴纸转 200px / 15fps 动态 WebP，托管在 NodeImage）
+    id: 'bocchi',
+    name: '孤独摇滚',
+    icon: '🎸',
+    source: 'https://t.me/addstickers/bocchi_1_y0ursfunny',
+    urls: ni(`
+      DKLtcl2qxekm2jo24YyCTETHsHmKtpAM.webp Gh4hcVZr1ApCFVm51Xx3iMjpXI0MYcKb.webp 0jJauCcwso4g2kKgO0isDkA0jDgIfMbv.webp
+      McUuyqjhT51DAew0p6959LvjRI802sn5.webp mUuDOTSl8y8I2jcV6xh2czkyQYSUAvXD.webp B69OZpQsx6lIjMkfnpgFo4NwEWjifRb7.webp
+      ybDyDLqLiSD1z50Rz3WE6Xz5S7KTAiSs.webp Cs9HHfQjGwm4oZkGaaTx6bjog6VhHGXn.webp vyMNV7uz3PVWvmpiTRT6mDaH2TRQ9P1l.webp
+      kp0VNYtLrgZdd3T9tHGbwlEtJKpoqfJD.webp K3FvX7rFj6kBDa7bJXqX5NcTlXmjrVpR.webp lFvvSLB2UKRPKEnATuBXj7Xko2O7wFdY.webp
+      PUC6Yre95GnAjwYxZ1ICm0m3DvvCEqIw.webp fIJbZ5ceMqhuyiKiC0RXlXY6tip1YcLL.webp WWgOKo7KyromUCdt0okgufyttIYYr469.webp
+      R9ztSt3HYv6JndA9Jwn1bqFUC5CYobB4.webp iqa8EV5nhlRNMiXQ8U91Kkr0b1VcJmHj.webp rEjt9AMPIXYzp4iPNHhyYYBvhp4RpIKD.webp
+      d7CKKYemZQpaPhYadXW0QqXkflbbjBaZ.webp TodnnLUm1BWgM8lZwzekgmRJoSUOHoZT.webp WGl70HAO0fkfGbyFTDovmyxCGvaY4C0B.webp
+      LwClfleW59yeyuYMeYR5DxOes8iqXrQz.webp WtxqfcoDL2eir39TT2GZ8bxvvmWlz5RL.webp kfmbkIOeLzm7irU5eWXD5WPRwJa6oaRd.webp
+      ji9qRvQITXBTiektnIsFAXxMXd9R52Ax.webp OKo47YKzv3c7YXMXR7f41KkYEYFr97XD.webp 6if25kVmF1y2dVZtcBFQ6g5Yv1RY0OfR.webp
+      Afrt8pXpaRSKEhIFYM5Dx7C5IKXlYJsK.webp CixDMPosQa8FhC9IrpYJMdUvvPvPtPl8.webp v1bexcPxnSLKN1fdpFkVZorrxOmyUZ0A.webp
+      A5QK3UluesWylavWXc2tZmC8T96KvbKS.webp lH4QFwZ2Thizp8mjNzEo0MgT4RUmnirI.webp YnOg87gggGq08etbz2ZSfFYXouElBnNY.webp
+      UIpXpfWTCQzmQ68UXKuxc42605WCuCXU.webp
+    `),
+  },
 ];
